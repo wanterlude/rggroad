@@ -633,7 +633,7 @@ export class World {
       this.addGeysers(row);
     }
     if (rollerKind) this.addRoller(row, rollerKind);
-    if (mechanics.fragile && this.mode !== "menu" && this.rng() < 0.82) {
+    if (mechanics.fragile && this.mode !== "menu" && this.rng() < 0.5) {
       this.addFragile(row, mechanics.fragile);
     }
     if (options.allowCoin) this.addCoin(row, 0.4, -3.8, 3.8);
