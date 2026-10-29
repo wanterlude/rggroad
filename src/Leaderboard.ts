@@ -8,6 +8,8 @@ export interface LeaderboardEntry {
   /** Display title; includes the run date for new records. */
   title?: string;
   runDate?: string;
+  runTime?: string;
+  runAt?: string;
   score: number;
   ts: number;
 }
@@ -58,14 +60,30 @@ export function normalizeNickname(raw: string): string | null {
   return name;
 }
 
-/** Local calendar date of the run: ISO for data, DD.MM.YYYY for the title. */
-function runDateInfo(date = new Date()): { runDate: string; label: string } {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+/**
+ * Run timestamp in GMT+3 (Europe/Moscow, no DST): ISO for data,
+ * "DD.MM.YYYY HH:MM МСК" for the displayed title.
+ */
+function runDateInfo(date = new Date()): {
+  runDate: string;
+  runTime: string;
+  runAt: string;
+  label: string;
+} {
+  const moscow = new Date(date.getTime() + 3 * 60 * 60 * 1000);
+  const year = moscow.getUTCFullYear();
+  const month = String(moscow.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(moscow.getUTCDate()).padStart(2, "0");
+  const hours = String(moscow.getUTCHours()).padStart(2, "0");
+  const minutes = String(moscow.getUTCMinutes()).padStart(2, "0");
+  const seconds = String(moscow.getUTCSeconds()).padStart(2, "0");
+  const runDate = `${year}-${month}-${day}`;
+  const runTime = `${hours}:${minutes}`;
   return {
-    runDate: `${year}-${month}-${day}`,
-    label: `${day}.${month}.${year}`
+    runDate,
+    runTime,
+    runAt: `${runDate}T${runTime}:${seconds}+03:00`,
+    label: `${day}.${month}.${year} ${runTime} МСК`
   };
 }
 
@@ -179,14 +197,24 @@ export class Leaderboard {
               typeof value.runDate === "string" && value.runDate.trim()
                 ? value.runDate.slice(0, 10)
                 : undefined;
-            // Older records predate the title field but still carry a real
-            // timestamp; show their date too instead of leaving them blank.
-            if (!title && ts > 1e12) {
+            let runTime =
+              typeof value.runTime === "string" && value.runTime.trim()
+                ? value.runTime.slice(0, 5)
+                : undefined;
+            let runAt =
+              typeof value.runAt === "string" && value.runAt.trim()
+                ? value.runAt.slice(0, 25)
+                : undefined;
+            // Older records predate the time/title fields but still carry a
+            // real timestamp; rebuild their title in GMT+3 with the time.
+            if (ts > 1e12 && (!title || !runTime)) {
               const info = runDateInfo(new Date(ts));
               title = `${name} · ${info.label}`;
               runDate = info.runDate;
+              runTime = info.runTime;
+              runAt = info.runAt;
             }
-            entries.push({ id, name, title, runDate, score: Math.floor(score), ts });
+            entries.push({ id, name, title, runDate, runTime, runAt, score: Math.floor(score), ts });
           }
         }
         entries.sort((a, b) => b.score - a.score || a.ts - b.ts);
@@ -213,16 +241,18 @@ export class Leaderboard {
           ? Math.floor(existingScore)
           : score;
       const stamp = new Date();
-      const { runDate, label } = runDateInfo(stamp);
+      const { runDate, runTime, runAt, label } = runDateInfo(stamp);
       await fetch(ownUrl, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: this.playerName,
-          // The date is part of the displayed record title, while the score
-          // remains the player's best result.
+          // The GMT+3 date and time are part of the displayed record title,
+          // while the score remains the player's best result.
           title: `${this.playerName} · ${label}`,
           runDate,
+          runTime,
+          runAt,
           score: bestScore,
           ts: stamp.getTime()
         })
