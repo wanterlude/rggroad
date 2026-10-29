@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { CarData, CubeSpec, LogData, TrainData } from "./types";
+import type { CarData, CubeSpec, LogData, RollerKind, TrainData } from "./types";
 import { BIOMES, type BiomeId, type IdleHazardKind } from "./biomes";
 import { PALETTE, SKINS, type SkinDef, type SkinId } from "./config";
 import { createBlobShadow, createVoxelMesh } from "./Voxel";
@@ -351,8 +351,71 @@ export function buildLog(data: LogData, biomeId?: BiomeId): THREE.Group {
   return group;
 }
 
-export function buildIdleHazard(kind: IdleHazardKind, biomeId?: BiomeId): THREE.Group {
+/**
+ * A hazard that crosses safe rows: a log rolling along the row in the forest,
+ * or a tumbleweed in the desert. `group.userData.spin` is rotated by the world.
+ */
+export function buildRoller(kind: RollerKind, biomeId?: BiomeId): THREE.Group {
   const group = new THREE.Group();
+  const spin = new THREE.Group();
+  const biome = biomeId ? BIOMES[biomeId] : null;
+  group.add(spin);
+  group.userData.spin = spin;
+
+  if (kind === "log") {
+    spin.position.y = 0.3;
+    const logColor = biome?.log ?? PALETTE.log;
+    const logDark = biome?.logDark ?? PALETTE.logDark;
+    const logLight = biome?.logLight ?? PALETTE.logLight;
+    const cylinder = new THREE.Mesh(logCylinderGeometry, getLogMaterial(logColor));
+    cylinder.scale.set(0.3, 1.5, 0.3);
+    cylinder.rotation.x = Math.PI / 2;
+    spin.add(cylinder);
+    const details: CubeSpec[] = [];
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      details.push({
+        x: Math.cos(angle) * 0.28,
+        y: Math.sin(angle) * 0.28,
+        z: i % 2 === 0 ? 0.52 : -0.52,
+        sx: 0.09,
+        sy: 0.09,
+        sz: 0.12,
+        color: i % 2 === 0 ? logDark : logLight,
+        rz: angle
+      });
+    }
+    spin.add(createVoxelMesh(details));
+    group.add(createBlobShadow(1.7, 0.9, 0.014));
+    return group;
+  }
+
+  spin.position.y = 0.5;
+  const wood = 0x8a6738;
+  const dark = 0x55401f;
+  const light = 0xd9b477;
+  const cubes: CubeSpec[] = [];
+  for (let i = 0; i < 20; i++) {
+    const angle = i * 2.399;
+    const radius = 0.38 + (i % 3) * 0.055;
+    cubes.push({
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius * 0.9,
+      z: Math.sin(angle * 1.7) * 0.28,
+      sx: 0.11 + (i % 4) * 0.025,
+      sy: 0.11,
+      sz: 0.11,
+      color: i % 5 === 0 ? light : i % 3 === 0 ? dark : wood,
+      rz: angle
+    });
+  }
+  spin.add(createVoxelMesh(cubes));
+  group.scale.setScalar(1.28);
+  group.add(createBlobShadow(1.15, 0.72, 0.014));
+  return group;
+}
+
+export function buildIdleHazard(kind: IdleHazardKind, biomeId?: BiomeId): THREE.Group {  const group = new THREE.Group();
   const biome = biomeId ? BIOMES[biomeId] : null;
   const cubes: CubeSpec[] = [];
   const accent = biome?.accent ?? 0xffd23f;

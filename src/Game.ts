@@ -418,6 +418,9 @@ export class Game {
     } else if (event.cause === "geyser") {
       this.audio.crash();
       this.audio.deathTone();
+    } else if (event.cause === "log" || event.cause === "tumble") {
+      this.audio.crash();
+      this.audio.deathTone();
     } else {
       this.audio.crash();
     }

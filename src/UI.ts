@@ -295,7 +295,11 @@ export class UI {
               ? "ХРУМ!"
               : options.cause === "geyser"
                 ? "ПШШ!"
-                : "БУМ!";
+                : options.cause === "log"
+                  ? "ХРЯСЬ!"
+                  : options.cause === "tumble"
+                    ? "ВЖУХ!"
+                    : "БУМ!";
     const message =
       options.cause === "water"
         ? "Бревно уплыло. В следующий раз прыгай точнее."
@@ -307,7 +311,11 @@ export class UI {
               ? "Крокодил не любит, когда прыгают ему на голову."
               : options.cause === "geyser"
                 ? "Гейзер не ждёт. Уходи с клетки, как только загорелось кольцо."
-                : "Машины не тормозят. Проверь оба ряда.";
+                : options.cause === "log"
+                  ? "Бревно катится через лужайку. Пережди или отойди в сторону."
+                  : options.cause === "tumble"
+                    ? "Перекати-поле не сворачивает. Не стой на его пути."
+                    : "Машины не тормозят. Проверь оба ряда.";
     this.refs.overTitle.textContent = title;
     this.refs.overMessage.textContent = message;
     this.refs.finalScore.textContent = fmt(options.score);

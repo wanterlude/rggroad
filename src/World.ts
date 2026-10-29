@@ -34,6 +34,7 @@ import type {
   LogData,
   PlayerState,
   PropData,
+  RollerKind,
   Row,
   RowType,
   SignData,
@@ -45,6 +46,7 @@ import {
   buildCoin,
   buildIdleHazard,
   buildLog,
+  buildRoller,
   buildTrain
 } from "./Models";
 import {
@@ -82,8 +84,16 @@ const PLAYER_X_LIMIT = 30;
 // Geyser cycle: calm -> glowing warning (1.5 s) -> eruption (0.7 s) -> calm.
 const GEYSER_WARN_SECONDS = 1.5;
 const GEYSER_ERUPT_SECONDS = 0.7;
+// City traffic cycle: green -> amber -> red.
+const LIGHT_GREEN_SECONDS = 4.4;
+const LIGHT_AMBER_SECONDS = 0.8;
+const LIGHT_CYCLE = LIGHT_GREEN_SECONDS + LIGHT_AMBER_SECONDS + 2.8;
 const geyserRingGeometry = new THREE.RingGeometry(0.24, 0.44, 24);
 const geyserVentGeometry = new THREE.CircleGeometry(0.24, 20);
+const lampGeometry = new THREE.CircleGeometry(0.115, 14);
+const lightHousingGeometry = new THREE.BoxGeometry(0.46, 1.05, 0.28);
+const lightPoleGeometry = new THREE.CylinderGeometry(0.055, 0.055, 3.4, 8);
+const lightBaseGeometry = new THREE.BoxGeometry(0.34, 0.12, 0.34);
 
 const DEFAULT_MECHANICS: BiomeMechanics = {
   speed: 1,
@@ -401,6 +411,16 @@ export class World {
       geyser.vent = vent;
     }
 
+    for (const roller of row.rollers ?? []) {
+      const group = buildRoller(roller.kind, row.biome);
+      group.position.set(roller.x, 0, 0);
+      roller.group = group;
+      roller.spin = group.userData.spin as THREE.Group | undefined;
+      row.group.add(group);
+    }
+
+    if (row.light) this.buildTrafficLight(row);
+
     if (row.type === "water") {
       row.waterMesh = buildWaterSurface(row.biome);
       row.group.add(row.waterMesh);
@@ -529,11 +549,31 @@ export class World {
     row.variant = Math.floor(this.rng() * 4);
     this.addDecor(row);
     if (options.allowProps) this.addProps(row);
-    if (this.mechanicsAt(z).geysers && this.mode !== "menu" && this.rng() < 0.78) {
+    const mechanics = this.mechanicsAt(z);
+    if (mechanics.geysers && this.mode !== "menu" && this.rng() < 0.78) {
       this.addGeysers(row);
+    }
+    if (mechanics.rollers && this.mode !== "menu" && this.rng() < 0.36) {
+      this.addRoller(row, mechanics.rollers);
     }
     if (options.allowCoin) this.addCoin(row, 0.4, -3.8, 3.8);
     return row;
+  }
+
+  /** Forest logs and desert tumbleweeds cross the safe rows from the side. */
+  private addRoller(row: Row, kind: RollerKind): void {
+    const dir: 1 | -1 = this.rng() < 0.5 ? 1 : -1;
+    const edge = HALF_SPAN + 7;
+    row.rollers = [
+      {
+        x: -dir * edge,
+        dir,
+        speed: rr(this.rng, 3.4, 5.4),
+        radius: kind === "log" ? 0.55 : 0.42,
+        kind,
+        phase: this.rng() * Math.PI * 2
+      }
+    ];
   }
 
   /** Lava ground vents. They sit on walkable cells and telegraph before firing. */
@@ -671,7 +711,8 @@ export class World {
     row.dir = dir;
     row.speed = speed;
     const gap = rr(this.rng, 4.8, 8.2) - difficulty * 1.7;
-    const policePossible = this.mechanicsAt(z).police;
+    const mechanics = this.mechanicsAt(z);
+    const policePossible = mechanics.police;
     // Leave a safe circular gap at the lane seam. Without this margin the last
     // car can wrap into the first one and they visibly overlap.
     const laneMargin = 1.1;
@@ -717,6 +758,13 @@ export class World {
         phase: this.rng() * Math.PI * 2,
         cargo: biome.shell
       });
+    }
+    if (mechanics.lights && this.rows.get(z - 1)?.type === "grass" && this.rng() < 0.62) {
+      row.light = {
+        cycle: LIGHT_CYCLE,
+        phase: this.rng() * LIGHT_CYCLE,
+        stop: false
+      };
     }
     this.addCoin(row, 0.28, -3.9, 3.9);
     return row;
@@ -812,6 +860,7 @@ export class World {
     dt = clamp(dt, 0, 0.05);
     this.time = time;
     this.ensureRowsAround(this.player.z);
+    this.updateLights(time);
     this.updateTraffic(dt);
     if ((this.mode === "demo" || (this.mode === "run" && this.botEnabled)) && !this.player.dead) {
       this.updateDemoBot(dt);
@@ -837,10 +886,17 @@ export class World {
     for (const row of this.rows.values()) {
       if (row.z < nearMin || row.z > nearMax) continue;
       if (row.type === "road") {
+        const stopping = row.light?.stop === true;
         for (const car of row.cars) {
-          car.x += car.dir * car.speed * dt;
-          if (car.x - car.len * 0.5 > ref + HALF_SPAN) car.x -= FULL_SPAN;
-          if (car.x + car.len * 0.5 < ref - HALF_SPAN) car.x += FULL_SPAN;
+          // Do not freeze a car that is already next to the hero: let it clear
+          // the lane first so the red light never slams a car into the player.
+          const frozen =
+            stopping && (Math.abs(row.z - p.z) > 0.7 || Math.abs(car.x - p.x) > 1.25);
+          if (!frozen) {
+            car.x += car.dir * car.speed * dt;
+            if (car.x - car.len * 0.5 > ref + HALF_SPAN) car.x -= FULL_SPAN;
+            if (car.x + car.len * 0.5 < ref - HALF_SPAN) car.x += FULL_SPAN;
+          }
           if (car.group) car.group.position.x = car.x;
         }
         updateCarShadows(row.carShadows, row.cars);
@@ -861,6 +917,7 @@ export class World {
       } else if (row.type === "rail" && row.train) {
         this.updateTrain(row, dt);
       }
+      if (row.rollers) this.updateRollers(row, dt);
     }
 
     if (p.ridingLog && !p.dead && !p.hopping) {
@@ -917,6 +974,111 @@ export class World {
       train.group.visible = train.active && row.z > p.z - DRAW_BEHIND;
     }
     updateRailGlows(row, this.time);
+  }
+
+  /** A cantilever signal over the lane, fed by a pole on the lawn behind it. */
+  private buildTrafficLight(row: Row): void {
+    const light = row.light;
+    if (!light) return;
+    const prev = this.rows.get(row.z - 1);
+    const blocked = (x: number): boolean =>
+      prev?.props.some((prop) => prop.collider && Math.abs(prop.x - x) < 0.9) ?? false;
+    let poleX = 6;
+    if (blocked(poleX)) poleX = -6;
+    const group = new THREE.Group();
+    const metal = new THREE.MeshLambertMaterial({ color: 0x2a3238 });
+    const base = new THREE.Mesh(lightBaseGeometry, metal);
+    base.position.set(poleX, 0.06, -1);
+    const pole = new THREE.Mesh(lightPoleGeometry, metal);
+    pole.position.set(poleX, 1.7, -1);
+    const zBeam = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 1), metal);
+    zBeam.position.set(poleX, 3.35, -0.5);
+    const xBeam = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(poleX), 0.09, 0.09), metal);
+    xBeam.position.set(poleX / 2, 3.35, 0);
+    const cable = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.02, 0.24, 5),
+      new THREE.MeshBasicMaterial({ color: 0x1c2226 })
+    );
+    cable.position.set(0, 3.23, 0);
+    const housing = new THREE.Mesh(
+      lightHousingGeometry,
+      new THREE.MeshLambertMaterial({ color: 0x232a2f })
+    );
+    housing.position.set(0, 2.6, 0);
+    group.add(base, pole, zBeam, xBeam, cable, housing);
+    const makeLamp = (y: number): THREE.Mesh => {
+      const lamp = new THREE.Mesh(
+        lampGeometry,
+        new THREE.MeshBasicMaterial({ color: 0x2a2426, side: THREE.DoubleSide })
+      );
+      lamp.position.set(0, y, -0.15);
+      lamp.rotation.y = Math.PI;
+      group.add(lamp);
+      return lamp;
+    };
+    light.red = makeLamp(2.92);
+    light.amber = makeLamp(2.6);
+    light.green = makeLamp(2.28);
+    light.housing = group;
+    row.group.add(group);
+  }
+
+  private updateLights(time: number): void {
+    for (const row of this.rows.values()) {
+      const light = row.light;
+      if (!light || !light.housing) continue;
+      const local = ((time + light.phase) % light.cycle + light.cycle) % light.cycle;
+      const state =
+        local < LIGHT_GREEN_SECONDS
+          ? "green"
+          : local < LIGHT_GREEN_SECONDS + LIGHT_AMBER_SECONDS
+            ? "amber"
+            : "red";
+      light.stop = state !== "green";
+      this.setLamp(light.red, state === "red", 0xff3b30);
+      this.setLamp(light.amber, state === "amber", 0xffb02e);
+      this.setLamp(light.green, state === "green", 0x42e06a);
+    }
+  }
+
+  private setLamp(lamp: THREE.Mesh | undefined, lit: boolean, color: number): void {
+    if (!lamp) return;
+    (lamp.material as THREE.MeshBasicMaterial).color.setHex(lit ? color : 0x2a2426);
+  }
+
+  private updateRollers(row: Row, dt: number): void {
+    const p = this.player;
+    const reach = Math.abs(p.x) + HALF_SPAN + 7;
+    for (const roller of row.rollers ?? []) {
+      roller.x += roller.dir * roller.speed * dt;
+      if (roller.x > reach) roller.x = -reach;
+      else if (roller.x < -reach) roller.x = reach;
+      if (roller.group) roller.group.position.x = roller.x;
+      if (roller.spin) roller.spin.rotation.z -= (roller.dir * roller.speed * dt) / 0.32;
+      if (Math.random() < dt * 9) {
+        this.sceneView.particles.spawn({
+          x: roller.x + (Math.random() - 0.5) * 0.25,
+          y: 0.06,
+          z: row.z + (Math.random() - 0.5) * 0.35,
+          vx: -roller.dir * (0.35 + Math.random() * 0.5),
+          vy: 0.5 + Math.random() * 0.7,
+          vz: (Math.random() - 0.5) * 0.3,
+          gravity: 3.2,
+          life: 0.25 + Math.random() * 0.2,
+          size: 0.04 + Math.random() * 0.04,
+          color: roller.kind === "log" ? 0xb98b56 : 0xd8b27a,
+          spin: 4
+        });
+      }
+      if (
+        !p.dead &&
+        Math.abs(p.z - row.z) < 0.62 &&
+        Math.abs(p.x - roller.x) < roller.radius + 0.3
+      ) {
+        this.die(roller.kind === "log" ? "log" : "tumble");
+        return;
+      }
+    }
   }
 
   private updateGeysers(dt: number, time: number): void {
@@ -1325,6 +1487,17 @@ export class World {
     this.demoMoveTimer -= dt;
     if (this.demoMoveTimer > 0) return;
 
+    // A log or tumbleweed is about to reach the hero: sidestep it first.
+    const here = this.rows.get(Math.round(p.z));
+    const threat = here?.rollers?.find((roller) => Math.abs(roller.x - p.x) < 2.1);
+    if (threat) {
+      const away = Math.sign(p.x - threat.x) || 1;
+      if (this.tryMove(away, 0)) {
+        this.demoMoveTimer = 0.12;
+        return;
+      }
+    }
+
     const action = this.planDemoRoute();
     if (action) {
       if (action.wait) {
@@ -1437,7 +1610,7 @@ export class World {
             ride = this.demoLogAt(targetRow, targetX, landingTime);
             if (!ride) continue;
           } else if (targetRow.type === "grass") {
-            if (!this.demoGrassSafe(targetRow, targetX)) continue;
+            if (!this.demoGrassSafe(targetRow, targetX, landingTime)) continue;
           }
 
           const nextFirst = node.first ?? action;
@@ -1472,12 +1645,16 @@ export class World {
     return row.type === "grass" || (row.type === "water" && !!ride);
   }
 
-  private demoGrassSafe(row: Row, x: number): boolean {
+  private demoGrassSafe(row: Row, x: number, time = 0): boolean {
     for (const prop of row.props) {
       if (prop.collider && Math.abs(prop.x - x) < prop.radius + 0.28) return false;
     }
     for (const geyser of row.geysers ?? []) {
       if (Math.abs(geyser.x - x) < 0.65) return false;
+    }
+    for (const roller of row.rollers ?? []) {
+      const predicted = roller.x + roller.dir * roller.speed * time;
+      if (Math.abs(predicted - x) < roller.radius + 0.85) return false;
     }
     return true;
   }
@@ -1491,6 +1668,21 @@ export class World {
   }
 
   private demoRoadSafe(row: Row, x: number, startTime: number, landingTime: number): boolean {
+    // A red or amber light freezes the whole lane: cars stay where they are.
+    // If the light never turns green inside the hop window, only the frozen
+    // positions matter. Otherwise fall back to the conservative moving check.
+    if (row.light) {
+      let anyGreen = false;
+      for (let t = startTime; t <= landingTime + 0.25 + 0.0001; t += 0.05) {
+        const local =
+          ((this.time + t + row.light.phase) % row.light.cycle + row.light.cycle) % row.light.cycle;
+        if (local < LIGHT_GREEN_SECONDS) {
+          anyGreen = true;
+          break;
+        }
+      }
+      if (!anyGreen) return this.demoCarClear(row, x, 0);
+    }
     // Cover the whole hop and the short window after landing. This catches
     // cars that would hit mid-hop, not just exactly at the landing instant.
     for (let t = startTime; t <= landingTime + 0.25 + 0.0001; t += 0.05) {
@@ -1590,6 +1782,12 @@ export class World {
       const skin = SKINS[this.skinId];
       this.sceneView.particles.burstDust(p.x, p.z, 16, 0xff8a3d);
       this.sceneView.particles.burstFeathers(p.x, p.z, [0xffb35c, 0xff7a2a, 0xffe08a, skin.body]);
+    } else if (cause === "log" || cause === "tumble") {
+      this.shake = Math.max(this.shake, 0.6);
+      const skin = SKINS[this.skinId];
+      const wood = cause === "log" ? 0xb98b56 : 0xd8b27a;
+      this.sceneView.particles.burstDust(p.x, p.z, 14, wood);
+      this.sceneView.particles.burstFeathers(p.x, p.z, [wood, 0x8a6a3e, skin.body, 0xfff7e2]);
     } else {
       this.shake = Math.max(this.shake, cause === "train" ? 1.05 : 0.7);
       const skin = SKINS[this.skinId];

@@ -4,7 +4,7 @@ import type { BiomeDecorKind, BiomeId, BiomePropKind } from "./biomes";
 
 export type GameState = "menu" | "playing" | "paused" | "dying" | "gameover";
 export type RowType = "grass" | "road" | "water" | "rail";
-export type DeathCause = "car" | "train" | "water" | "eagle" | "crocodile" | "geyser";
+export type DeathCause = "car" | "train" | "water" | "eagle" | "crocodile" | "geyser" | "log" | "tumble";
 
 export interface SaveData {
   best: number;
@@ -112,6 +112,29 @@ export interface GeyserData {
   erupting?: boolean;
 }
 
+export type RollerKind = "log" | "tumbleweed";
+
+export interface RollerData {
+  x: number;
+  dir: 1 | -1;
+  speed: number;
+  radius: number;
+  kind: RollerKind;
+  phase: number;
+  group?: THREE.Group;
+  spin?: THREE.Group;
+}
+
+export interface TrafficLightData {
+  cycle: number;
+  phase: number;
+  stop: boolean;
+  housing?: THREE.Group;
+  red?: THREE.Mesh;
+  amber?: THREE.Mesh;
+  green?: THREE.Mesh;
+}
+
 export interface Row {
   z: number;
   type: RowType;
@@ -125,6 +148,8 @@ export interface Row {
   cars: CarData[];
   logs: LogData[];
   geysers?: GeyserData[];
+  rollers?: RollerData[];
+  light?: TrafficLightData;
   signs: SignData[];
   train: TrainData | null;
   dir: 1 | -1;

@@ -41,6 +41,10 @@ export interface BiomeMechanics {
   geysers?: boolean;
   /** Jump duration multiplier. 1.55 = floaty low-gravity hops. */
   gravity?: number;
+  /** A hazard that rolls across safe rows: forest logs or desert tumbleweeds. */
+  rollers?: "log" | "tumbleweed";
+  /** City: cars stop at red and drive at green. */
+  lights?: boolean;
 }
 
 export type BiomePropKind =
@@ -573,8 +577,8 @@ const BASE_BIOMES: Record<BaseBiomeId, BiomeDef> = {
 
 const BASE_MECHANICS: Record<BaseBiomeId, BiomeMechanics> = {
   autumn: { speed: 1, road: 0.43, river: 0.22, rail: 0.14, water: "logs", police: false, idle: "eagle", stampede: false },
-  forest: { speed: 1.02, road: 0.42, river: 0.22, rail: 0.13, water: "logs", police: false, idle: "eagle", stampede: false },
-  desert: { speed: 1.08, road: 0.5, river: 0.12, rail: 0.12, water: "crocodile", police: false, idle: "eagle", stampede: false },
+  forest: { speed: 1.02, road: 0.42, river: 0.22, rail: 0.13, water: "logs", police: false, idle: "eagle", stampede: false, rollers: "log" },
+  desert: { speed: 1.08, road: 0.5, river: 0.12, rail: 0.12, water: "crocodile", police: false, idle: "eagle", stampede: false, rollers: "tumbleweed" },
   ocean: { speed: 0.98, road: 0.3, river: 0.37, rail: 0.1, water: "logs", police: false, idle: "eagle", stampede: false },
   frost: { speed: 1.06, road: 0.38, river: 0.26, rail: 0.12, water: "ice", police: false, idle: "eagle", stampede: false, slide: true },
   lava: { speed: 1.25, road: 0.42, river: 0.23, rail: 0.13, water: "logs", police: false, idle: "eagle", stampede: false, geysers: true },
@@ -705,7 +709,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
       { kind: "tuft", weight: 0.3 },
       { kind: "pebble", weight: 0.55 }
     ],
-    mechanics: { speed: 1.4, road: 0.56, river: 0.13, rail: 0.1, water: "logs", police: true, idle: "eagle", stampede: false }
+    mechanics: { speed: 1.4, road: 0.56, river: 0.13, rail: 0.1, water: "logs", police: true, idle: "eagle", stampede: false, lights: true }
   }),
   space: variant("space", "КОСМОС", "void", {
     grass: [0x3b334f, 0x352d48, 0x453b5b],
@@ -875,15 +879,15 @@ export function biomeForZ(z: number): BiomeDef {
 
 export const BIOME_DESCRIPTIONS: Record<BiomeId, string> = {
   autumn: "Спокойный старт: знакомый трафик, брёвна и орёл. Разомнись — дальше будет разнообразнее.",
-  forest: "Брёвна, густой лес и орёл. Дороги реже, но расслабляться нельзя.",
-  desert: "Больше дорог, крокодилы в воде и жара. Держи темп.",
+  forest: "По лужайкам катятся брёвна. Пережди, пока бревно пройдёт, или обойди его.",
+  desert: "Перекати-поле катится через лужайки. Не стой на его пути.",
   ocean: "Много рек: прыгай по брёвнам и не дай унести себя.",
   frost: "Скользко: после приземления тебя проносит ещё на клетку. Тормози заранее и не прыгай впритык.",
   lava: "Гейзеры: из трещин бьёт огонь. Пульсирующее кольцо — предупреждение, уходи с клетки.",
   void: "Финал цикла: НЛО вместо орла и ледяные реки.",
   savanna: "Стервятник кружит сверху, в воде крокодилы. Не останавливайся.",
   jungle: "Много воды и лилий — прыгай по островкам.",
-  city: "Плотный поток и полицейские машины. Смотри на оба ряда.",
+  city: "Светофоры: на красный машины стоят. Переходи, когда поток замер.",
   space: "Низкая гравитация: прыжок дольше и выше. Держи ритм и рассчитывай траекторию.",
   candy: "Шоколадные реки и конфетный самолёт. Сладко и опасно.",
   prehistoric: "Стампида вместо поездов и птеродактиль. Слушай гул земли.",
