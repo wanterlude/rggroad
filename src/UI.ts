@@ -15,6 +15,7 @@ interface UIHandlers {
   onSound: () => void;
   onMusic: () => void;
   onSkin: (skin: SkinId) => void;
+  onFavorite: (skin: SkinId) => void;
 }
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -405,23 +406,37 @@ export class UI {
     window.setTimeout(() => element.classList.remove("pop"), 330);
   }
 
-  renderSkinCards(): void {
+  renderSkinCards(focusSkin?: SkinId): void {
     const rail = this.refs.skinRail;
     rail.innerHTML = "";
     const selected = save.data.skin;
+    const favorites = new Set(save.data.favorites);
 
-    for (const key of SKIN_ORDER) {
+    // Newest favourite first, then the rest of the roster in its usual order.
+    const order = [
+      ...save.data.favorites.filter((id) => SKIN_ORDER.includes(id)),
+      ...SKIN_ORDER.filter((id) => !favorites.has(id))
+    ];
+
+    for (const key of order) {
       const skin = SKINS[key];
       const unlocked = save.data.unlocked.includes(key);
       const isSelected = selected === key;
+      const isFavorite = favorites.has(key);
       const canBuy = !unlocked && save.data.coins >= skin.cost;
 
-      const card = document.createElement("button");
-      card.type = "button";
+      const card = document.createElement("div");
       card.className = "char-card";
       card.dataset.skin = key;
-      card.setAttribute("aria-pressed", String(isSelected));
-      card.setAttribute(
+      if (isSelected) card.classList.add("is-selected");
+      if (!unlocked) card.classList.add("is-locked");
+      if (canBuy) card.classList.add("can-buy");
+
+      const main = document.createElement("button");
+      main.type = "button";
+      main.className = "char-main";
+      main.setAttribute("aria-pressed", String(isSelected));
+      main.setAttribute(
         "aria-label",
         `${skin.name}${
           isSelected
@@ -433,9 +448,6 @@ export class UI {
                 : ", бесплатный"
         }`
       );
-      if (isSelected) card.classList.add("is-selected");
-      if (!unlocked) card.classList.add("is-locked");
-      if (canBuy) card.classList.add("can-buy");
 
       const art = document.createElement("span");
       art.className = "char-art";
@@ -457,12 +469,12 @@ export class UI {
         badge.style.display = "none";
       }
       art.appendChild(badge);
-      card.appendChild(art);
+      main.appendChild(art);
 
       const name = document.createElement("span");
       name.className = "char-name";
       name.textContent = skin.name;
-      card.appendChild(name);
+      main.appendChild(name);
 
       const cost = document.createElement("span");
       cost.className = "char-cost";
@@ -470,18 +482,42 @@ export class UI {
       else if (unlocked) cost.textContent = "ВЫБРАТЬ";
       else if (skin.cost === 0) cost.textContent = "БЕСПЛАТНО";
       else cost.innerHTML = `<span class="coin-icon" aria-hidden="true"></span><span>${skin.cost}</span>`;
-      card.appendChild(cost);
+      main.appendChild(cost);
 
-      card.addEventListener("click", () => {
+      main.addEventListener("click", () => {
         this.handlers.onSkin(key);
         if (GENERATED_ART[key]) this.openArtwork(key);
       });
+      card.appendChild(main);
+
+      const favorite = document.createElement("button");
+      favorite.type = "button";
+      favorite.className = "char-fav";
+      if (isFavorite) favorite.classList.add("is-fav");
+      favorite.setAttribute("aria-pressed", String(isFavorite));
+      favorite.setAttribute(
+        "aria-label",
+        isFavorite ? `Убрать ${skin.name} из избранного` : `Добавить ${skin.name} в избранное`
+      );
+      favorite.title = isFavorite ? "Убрать из избранного" : "В избранное";
+      favorite.innerHTML =
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3.1-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z"/></svg>';
+      favorite.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.handlers.onFavorite(key);
+      });
+      card.appendChild(favorite);
+
       rail.appendChild(card);
       drawPortrait(preview, key);
     }
-    const selectedCard = rail.querySelector<HTMLElement>(".char-card.is-selected");
-    if (selectedCard) {
-      rail.scrollLeft = Math.max(0, selectedCard.offsetLeft - 2);
+
+    const targetSkin = focusSkin ?? (favorites.size > 0 ? order[0] : selected);
+    const focus = rail.querySelector<HTMLElement>(
+      `.char-card[data-skin="${targetSkin}"]`
+    );
+    if (focus) {
+      rail.scrollLeft = Math.max(0, focus.offsetLeft - 2);
     }
     this.wheelIndex = -1;
     this.wheelAccum = 0;

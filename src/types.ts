@@ -11,6 +11,7 @@ export interface SaveData {
   coins: number;
   skin: SkinId;
   unlocked: SkinId[];
+  favorites: SkinId[];
   muted: boolean;
   musicMuted: boolean;
   runs: number;

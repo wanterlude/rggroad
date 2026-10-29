@@ -66,7 +66,8 @@ export class Game {
       onMenu: () => this.goMenu(),
       onSound: () => this.toggleSound(),
       onMusic: () => this.toggleMusic(),
-      onSkin: (skin) => this.selectSkin(skin)
+      onSkin: (skin) => this.selectSkin(skin),
+      onFavorite: (skin) => this.toggleFavorite(skin)
     });
 
     this.world = this.createWorld(true);
@@ -220,7 +221,7 @@ export class Game {
       if (this.state === "menu") {
         this.world.setSkin(skinId);
       }
-      this.ui.renderSkinCards();
+      this.ui.renderSkinCards(skinId);
       return;
     }
 
@@ -234,9 +235,20 @@ export class Game {
       this.audio.unlock();
       if (this.state === "menu") this.world.setSkin(skinId);
       this.ui.updateHUD(this.score);
-      this.ui.renderSkinCards();
+      this.ui.renderSkinCards(skinId);
       this.ui.showToast(`${skin.name} открыт! Отличный выбор.`);
     }
+  }
+
+  /** Pin a hero to the front of the picker; toggling is instant and saved. */
+  private toggleFavorite(skinId: SkinId): void {
+    const favorites = save.data.favorites;
+    const index = favorites.indexOf(skinId);
+    if (index >= 0) favorites.splice(index, 1);
+    else favorites.unshift(skinId);
+    save.write();
+    this.audio.click();
+    this.ui.renderSkinCards(skinId);
   }
 
   private bindEvents(): void {

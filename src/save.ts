@@ -11,6 +11,7 @@ const defaults: SaveData = {
   coins: 0,
   skin: "moryaka",
   unlocked: [...FREE_SKINS],
+  favorites: [],
   muted: false,
   musicMuted: false,
   runs: 0,
@@ -42,6 +43,15 @@ function sanitize(raw: unknown): SaveData {
   data.unlocked = unlocked;
 
   if (isSkinId(src.skin) && unlocked.includes(src.skin)) data.skin = src.skin;
+
+  const favorites: SkinId[] = [];
+  if (Array.isArray(src.favorites)) {
+    for (const value of src.favorites) {
+      if (isSkinId(value) && !favorites.includes(value)) favorites.push(value);
+    }
+  }
+  data.favorites = favorites;
+
   data.muted = src.muted === true;
   data.musicMuted = src.musicMuted === true;
   data.economyVersion = ECONOMY_VERSION;
