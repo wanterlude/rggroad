@@ -50,6 +50,8 @@ export interface BiomeMechanics {
   lights?: boolean;
   /** Storm intermediate: rain overlay and a darker sky. */
   storm?: boolean;
+  /** Void and Halloween: floor tiles that crack and disappear. */
+  fragile?: "void" | "ghost";
 }
 
 export type BiomePropKind =
@@ -591,7 +593,7 @@ const BASE_MECHANICS: Record<BaseBiomeId, BiomeMechanics> = {
   ocean: { speed: 0.98, road: 0.3, river: 0.37, rail: 0.1, water: "logs", police: false, idle: "eagle", stampede: false },
   frost: { speed: 1.06, road: 0.38, river: 0.26, rail: 0.12, water: "ice", police: false, idle: "eagle", stampede: false, slide: true },
   lava: { speed: 1.25, road: 0.42, river: 0.23, rail: 0.13, water: "logs", police: false, idle: "eagle", stampede: false, geysers: true },
-  void: { speed: 1.32, road: 0.43, river: 0.24, rail: 0.14, water: "ice", police: false, idle: "ufo", stampede: false }
+  void: { speed: 1.32, road: 0.43, river: 0.24, rail: 0.14, water: "ice", police: false, idle: "ufo", stampede: false, fragile: "void" }
 };
 
 for (const [id, biome] of Object.entries(BASE_BIOMES) as [BaseBiomeId, BiomeDef][]) {
@@ -868,7 +870,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
       { kind: "pebble", weight: 0.3 },
       { kind: "tuft", weight: 0.15 }
     ],
-    mechanics: { speed: 1.15, road: 0.4, river: 0.26, rail: 0.15, water: "logs", police: false, idle: "bat", stampede: false }
+    mechanics: { speed: 1.15, road: 0.4, river: 0.26, rail: 0.15, water: "logs", police: false, idle: "bat", stampede: false, fragile: "ghost" }
   })
 };
 
@@ -1081,14 +1083,14 @@ export const BIOME_DESCRIPTIONS: Record<BiomeId, string> = {
   ocean: "Много рек: прыгай по брёвнам и не дай унести себя.",
   frost: "Скользко: после приземления тебя проносит ещё на клетку. Тормози заранее и не прыгай впритык.",
   lava: "Гейзеры: из трещин бьёт огонь. Пульсирующее кольцо — предупреждение, уходи с клетки.",
-  void: "Финал цикла: НЛО вместо орла и ледяные реки.",
+  void: "Финал цикла: НЛО вместо орла и плиты, которые трескаются и проваливаются.",
   savanna: "Стервятник кружит сверху, в воде крокодилы. Не останавливайся.",
   jungle: "Много воды и лилий — прыгай по островкам.",
   city: "Светофоры: на красный машины стоят. Переходи, когда поток замер.",
   space: "Низкая гравитация: прыжок дольше и выше. Держи ритм и рассчитывай траекторию.",
   candy: "Шоколадные реки и конфетный самолёт. Сладко и опасно.",
   prehistoric: "Стампида вместо поездов и птеродактиль. Слушай гул земли.",
-  halloween: "Летучая мышь и туман. Не оглядывайся.",
+  halloween: "Призрачные плиты мерцают и исчезают. Не задерживайся на них.",
   storm: "Гроза: дождь, сумрак и ускоренный трафик. Держи ритм, не зевай.",
   flood: "Половодье: вместо лужаек вода. Отдых только на островках.",
   crossroads: "Перекрёсток: только дороги и светофоры. Переходи на красный.",

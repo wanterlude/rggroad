@@ -31,6 +31,8 @@ import type {
   CarData,
   CoinData,
   DeathCause,
+  FragileKind,
+  FragileTileData,
   GameEvent,
   GeyserData,
   LogData,
@@ -86,12 +88,18 @@ const PLAYER_X_LIMIT = 30;
 // Geyser cycle: calm -> glowing warning (1.5 s) -> eruption (0.7 s) -> calm.
 const GEYSER_WARN_SECONDS = 1.5;
 const GEYSER_ERUPT_SECONDS = 0.7;
+// Fragile floor: crack for 1.2 s, then the plate is gone for 3.2 s.
+const FRAGILE_WARN_SECONDS = 1.2;
+const FRAGILE_GONE_SECONDS = 3.2;
 // City traffic cycle: green -> amber -> red.
 const LIGHT_GREEN_SECONDS = 4.4;
 const LIGHT_AMBER_SECONDS = 0.8;
 const LIGHT_CYCLE = LIGHT_GREEN_SECONDS + LIGHT_AMBER_SECONDS + 2.8;
 const geyserRingGeometry = new THREE.RingGeometry(0.24, 0.44, 24);
 const geyserVentGeometry = new THREE.CircleGeometry(0.24, 20);
+const fragileTileGeometry = new THREE.BoxGeometry(0.94, 0.06, 0.94);
+const fragileHoleGeometry = new THREE.PlaneGeometry(0.94, 0.94);
+const fragileCrackGeometry = new THREE.BoxGeometry(0.04, 0.02, 0.62);
 const lampGeometry = new THREE.CircleGeometry(0.115, 14);
 const lightHousingGeometry = new THREE.BoxGeometry(0.46, 1.05, 0.28);
 const lightPoleGeometry = new THREE.CylinderGeometry(0.055, 0.055, 3.4, 8);
@@ -242,7 +250,8 @@ export class World {
             (prop) => prop.collider && Math.abs(prop.x - x) < prop.radius + 0.32
           );
           const geyser = (spawnRow.geysers ?? []).some((g) => Math.abs(g.x - x) < 0.8);
-          if (!blocked && !geyser) {
+          const fragile = (spawnRow.fragile ?? []).some((tile) => Math.abs(tile.x - x) < 0.8);
+          if (!blocked && !geyser && !fragile) {
             spawnX = x;
             break;
           }
@@ -423,6 +432,8 @@ export class World {
       roller.spin = group.userData.spin as THREE.Group | undefined;
       row.group.add(group);
     }
+
+    for (const fragile of row.fragile ?? []) this.buildFragileTile(fragile, row);
 
     if (row.light) this.buildTrafficLight(row);
 
@@ -622,8 +633,31 @@ export class World {
       this.addGeysers(row);
     }
     if (rollerKind) this.addRoller(row, rollerKind);
+    if (mechanics.fragile && this.mode !== "menu" && this.rng() < 0.82) {
+      this.addFragile(row, mechanics.fragile);
+    }
     if (options.allowCoin) this.addCoin(row, 0.4, -3.8, 3.8);
     return row;
+  }
+
+  /** Void and Halloween ground plates that crack and drop out from under you. */
+  private addFragile(row: Row, kind: FragileKind): void {
+    const count = this.rng() < 0.6 ? 1 : 2;
+    const lane = [-3, -2, -1, 0, 1, 2, 3];
+    for (let i = lane.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      const swap = lane[i];
+      lane[i] = lane[j];
+      lane[j] = swap;
+    }
+    const tiles: FragileTileData[] = [];
+    for (const x of lane) {
+      if (tiles.length >= count) break;
+      if (row.props.some((prop) => prop.collider && Math.abs(prop.x - x) < prop.radius + 0.55)) continue;
+      if ((row.geysers ?? []).some((geyser) => Math.abs(geyser.x - x) < 0.8)) continue;
+      tiles.push({ x, kind, state: "idle", timer: 0 });
+    }
+    if (tiles.length > 0) row.fragile = tiles;
   }
 
   /** Forest logs and desert tumbleweeds cross the safe rows from the side. */
@@ -760,6 +794,7 @@ export class World {
       const x = Math.round(rr(this.rng, minX, maxX) * 2) / 2;
       if (row.props.some((p) => p.collider && Math.abs(p.x - x) < 1.05)) continue;
       if (row.geysers?.some((g) => Math.abs(g.x - x) < 0.75)) continue;
+      if (row.fragile?.some((tile) => Math.abs(tile.x - x) < 0.75)) continue;
       row.coin = {
         x,
         z: row.z,
@@ -933,6 +968,7 @@ export class World {
     }
     this.updatePlayer(dt, time);
     this.updateGeysers(dt, time);
+    this.updateFragile(dt, time);
     this.updateIdleHazard(dt);
     this.updateCoins(time);
     this.updateRowVisibility();
@@ -1040,6 +1076,146 @@ export class World {
       train.group.visible = train.active && row.z > p.z - DRAW_BEHIND;
     }
     updateRailGlows(row, this.time);
+  }
+
+  /** A stone/ghost plate with cracks and a black hole underneath. */
+  private buildFragileTile(fragile: FragileTileData, row: Row): void {
+    const isVoid = fragile.kind === "void";
+    const base = isVoid ? 0x6b6478 : 0x8d7aad;
+    const tile = new THREE.Mesh(
+      fragileTileGeometry,
+      new THREE.MeshLambertMaterial({ color: base, emissive: 0x000000 })
+    );
+    tile.position.set(fragile.x, 0.035, 0);
+
+    const crackColor = isVoid ? 0xffb35c : 0xe8c8ff;
+    const crackMaterial = new THREE.MeshBasicMaterial({ color: crackColor });
+    const crack = new THREE.Group();
+    crack.position.set(fragile.x, 0, 0);
+    const specs = [
+      { x: -0.14, z: 0.08, ry: 0.5, len: 0.62 },
+      { x: 0.16, z: -0.06, ry: -0.9, len: 0.5 },
+      { x: 0, z: 0.24, ry: 0.2, len: 0.42 }
+    ];
+    for (const spec of specs) {
+      const piece = new THREE.Mesh(fragileCrackGeometry, crackMaterial);
+      piece.scale.z = spec.len / 0.62;
+      piece.scale.x = 1.4;
+      piece.position.set(spec.x, 0.07, spec.z);
+      piece.rotation.y = spec.ry;
+      crack.add(piece);
+    }
+    const warnRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.5, 0.6, 20),
+      new THREE.MeshBasicMaterial({
+        color: crackColor,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      })
+    );
+    warnRing.rotation.x = -Math.PI / 2;
+    warnRing.position.y = 0.075;
+    crack.add(warnRing);
+    crack.visible = false;
+
+    const hole = new THREE.Mesh(
+      fragileHoleGeometry,
+      new THREE.MeshBasicMaterial({ color: 0x040208 })
+    );
+    hole.rotation.x = -Math.PI / 2;
+    hole.position.set(fragile.x, 0.02, 0);
+    const holeRim = new THREE.Mesh(
+      new THREE.RingGeometry(0.44, 0.5, 20),
+      new THREE.MeshBasicMaterial({ color: isVoid ? 0x8b6ff0 : 0xd8a0ff })
+    );
+    holeRim.position.z = 0.006;
+    hole.add(holeRim);
+    hole.visible = false;
+
+    row.group.add(hole, tile, crack);
+    fragile.tile = tile;
+    fragile.crack = crack;
+    fragile.hole = hole;
+  }
+
+  private updateFragile(dt: number, time: number): void {
+    if (this.mode === "menu") return;
+    const p = this.player;
+    if (p.dead) return;
+    const nearMin = p.z - 6;
+    const nearMax = p.z + 20;
+    for (const row of this.rows.values()) {
+      if (!row.fragile || row.z < nearMin || row.z > nearMax) continue;
+      for (const fragile of row.fragile) {
+        const on =
+          !p.hopping &&
+          Math.abs(p.z - row.z) < 0.55 &&
+          Math.abs(p.x - fragile.x) < 0.5 &&
+          p.y < 1.1;
+
+        if (fragile.state === "idle") {
+          if (on) {
+            fragile.state = "warning";
+            fragile.timer = FRAGILE_WARN_SECONDS;
+            if (fragile.crack) fragile.crack.visible = true;
+          }
+          continue;
+        }
+
+        if (fragile.state === "warning") {
+          fragile.timer -= dt;
+          const k = clamp(1 - fragile.timer / FRAGILE_WARN_SECONDS, 0, 1);
+          if (fragile.tile) {
+            const material = fragile.tile.material as THREE.MeshLambertMaterial;
+            const base = fragile.kind === "void" ? 0x6b6478 : 0x8d7aad;
+            const warn = fragile.kind === "void" ? 0xff8a3d : 0xd8a0ff;
+            material.color.setHex(warn);
+            material.emissive.setHex(warn);
+            material.emissiveIntensity = 0.3 + Math.abs(Math.sin(time * 18)) * 0.35;
+            fragile.tile.position.set(
+              fragile.x + (Math.random() - 0.5) * 0.02 * k,
+              0.035,
+              (Math.random() - 0.5) * 0.02 * k
+            );
+            fragile.tile.scale.y = 1 + k * 0.12;
+          }
+          if (fragile.timer <= 0) {
+            fragile.state = "gone";
+            fragile.timer = FRAGILE_GONE_SECONDS;
+            if (fragile.tile) fragile.tile.visible = false;
+            if (fragile.crack) fragile.crack.visible = false;
+            if (fragile.hole) fragile.hole.visible = true;
+            if (on) {
+              this.die(fragile.kind);
+              return;
+            }
+          }
+          continue;
+        }
+
+        fragile.timer -= dt;
+        if (on) {
+          this.die(fragile.kind);
+          return;
+        }
+        if (fragile.timer <= 0) {
+          fragile.state = "idle";
+          fragile.timer = 0;
+          if (fragile.tile) {
+            fragile.tile.visible = true;
+            fragile.tile.position.set(fragile.x, 0.035, 0);
+            fragile.tile.scale.set(1, 1, 1);
+            const material = fragile.tile.material as THREE.MeshLambertMaterial;
+            material.color.setHex(fragile.kind === "void" ? 0x6b6478 : 0x8d7aad);
+            material.emissive.setHex(0x000000);
+            material.emissiveIntensity = 0;
+          }
+          if (fragile.hole) fragile.hole.visible = false;
+        }
+      }
+    }
   }
 
   /** A cantilever signal over the lane, fed by a pole on the lawn behind it. */
@@ -1371,6 +1547,14 @@ export class World {
           return false;
         }
       }
+      for (const fragile of targetRow.fragile ?? []) {
+        if (fragile.state === "gone" && Math.abs(fragile.x - targetX) < 0.55) {
+          p.bumpT = 0.22;
+          this.shake = Math.max(this.shake, 0.14);
+          this.events.push({ type: "bump" });
+          return false;
+        }
+      }
     }
 
     p.fromX = p.x;
@@ -1481,6 +1665,7 @@ export class World {
     if (!row || row.type !== "grass") return;
     if (row.props.some((prop) => prop.collider && Math.abs(prop.x - targetX) < prop.radius + 0.28)) return;
     if ((row.geysers ?? []).some((g) => Math.abs(g.x - targetX) < 0.7)) return;
+    if ((row.fragile ?? []).some((tile) => Math.abs(tile.x - targetX) < 0.7)) return;
 
     p.fromX = p.x;
     p.fromZ = p.z;
@@ -1724,6 +1909,9 @@ export class World {
       const predicted = roller.x + roller.dir * roller.speed * time;
       if (Math.abs(predicted - x) < roller.radius + 0.85) return false;
     }
+    for (const fragile of row.fragile ?? []) {
+      if (Math.abs(fragile.x - x) < 0.7) return false;
+    }
     return true;
   }
 
@@ -1856,6 +2044,12 @@ export class World {
       const wood = cause === "log" ? 0xb98b56 : 0xd8b27a;
       this.sceneView.particles.burstDust(p.x, p.z, 14, wood);
       this.sceneView.particles.burstFeathers(p.x, p.z, [wood, 0x8a6a3e, skin.body, 0xfff7e2]);
+    } else if (cause === "void" || cause === "ghost") {
+      this.shake = Math.max(this.shake, 0.55);
+      const skin = SKINS[this.skinId];
+      const color = cause === "void" ? 0x8b6ff0 : 0xd8a0ff;
+      this.sceneView.particles.burstDust(p.x, p.z, 16, color);
+      this.sceneView.particles.burstFeathers(p.x, p.z, [color, 0x2a1a33, skin.body, 0xfff7e2]);
     } else {
       this.shake = Math.max(this.shake, cause === "train" ? 1.05 : 0.7);
       const skin = SKINS[this.skinId];

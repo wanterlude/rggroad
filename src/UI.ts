@@ -307,7 +307,11 @@ export class UI {
                   ? "ХРЯСЬ!"
                   : options.cause === "tumble"
                     ? "ВЖУХ!"
-                    : "БУМ!";
+                    : options.cause === "void"
+                      ? "ПРОВАЛ!"
+                      : options.cause === "ghost"
+                        ? "ИСЧЕЗ!"
+                        : "БУМ!";
     const message =
       options.cause === "water"
         ? "Бревно уплыло. В следующий раз прыгай точнее."
@@ -323,7 +327,11 @@ export class UI {
                   ? "Бревно катится через лужайку. Пережди или отойди в сторону."
                   : options.cause === "tumble"
                     ? "Перекати-поле не сворачивает. Не стой на его пути."
-                    : "Машины не тормозят. Проверь оба ряда.";
+                    : options.cause === "void"
+                      ? "Плита треснула и провалилась. Не задерживайся на трещинах."
+                      : options.cause === "ghost"
+                        ? "Призрачная плита растворилась. Не стой на ней."
+                        : "Машины не тормозят. Проверь оба ряда.";
     this.refs.overTitle.textContent = title;
     this.refs.overMessage.textContent = message;
     this.refs.finalScore.textContent = fmt(options.score);
