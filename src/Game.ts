@@ -267,8 +267,10 @@ export class Game {
     let dz = 0;
     if (code === "ArrowUp" || code === "KeyW" || code === "Space") dz = 1;
     else if (code === "ArrowDown" || code === "KeyS") dz = -1;
-    else if (code === "ArrowLeft" || code === "KeyA") dx = -1;
-    else if (code === "ArrowRight" || code === "KeyD") dx = 1;
+    // On screen, world +x points left (the camera looks along -x/+z), so the
+    // left key has to add +x and the right key has to subtract it.
+    else if (code === "ArrowLeft" || code === "KeyA") dx = 1;
+    else if (code === "ArrowRight" || code === "KeyD") dx = -1;
     if (dx === 0 && dz === 0) return;
     event.preventDefault();
     if (event.repeat) return;
@@ -305,7 +307,8 @@ export class Game {
     if (absX < threshold && absY < threshold) {
       if (elapsed < 520) moveZ = 1;
     } else if (absX > absY) {
-      moveX = dx > 0 ? 1 : -1;
+      // Swipe right must move the player to the screen-right, i.e. toward -x.
+      moveX = dx > 0 ? -1 : 1;
     } else {
       moveZ = dy < 0 ? 1 : -1;
     }
