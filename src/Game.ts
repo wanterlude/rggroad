@@ -6,7 +6,7 @@ import { World } from "./World";
 import { AudioEngine } from "./AudioEngine";
 import { UI } from "./UI";
 import { save } from "./save";
-import { currentSeason, type SeasonId } from "./season";
+import { currentSeason, loadSeasonOverride, nextSeason, storeSeasonOverride, type SeasonId } from "./season";
 import type { GameEvent, GameState } from "./types";
 import { clamp, damp } from "./utils";
 
@@ -18,6 +18,8 @@ export interface GameBootOptions {
   biome?: BiomeId;
   bot?: boolean;
   autostart?: boolean;
+  /** Suppress the biome-lab auto-start so a harness can drive runs itself. */
+  noAutostart?: boolean;
   season?: SeasonId;
 }
 
@@ -59,10 +61,17 @@ export class Game {
   private debugRun = false;
   private readonly biomesVisited = new Set<string>();
   private runMilestone = 0;
+  private season: SeasonId;
+  private hitboxes = false;
+  private hitboxCanvas: HTMLCanvasElement | null = null;
+  private benchMode = false;
+  private benchSeed: number | undefined;
+  private benchDeath: { cause: string; score: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement, boot: GameBootOptions = {}) {
     this.boot = boot;
-    const season = boot.season ?? currentSeason();
+    const season = boot.season ?? loadSeasonOverride() ?? currentSeason();
+    this.season = season;
     this.sceneView = new SceneView(canvas, season);
     this.ui = new UI({
       onPlay: () => this.startRun(),
@@ -73,7 +82,8 @@ export class Game {
       onSound: () => this.toggleSound(),
       onMusic: () => this.toggleMusic(),
       onSkin: (skin) => this.selectSkin(skin),
-      onFavorite: (skin) => this.toggleFavorite(skin)
+      onFavorite: (skin) => this.toggleFavorite(skin),
+      onSeason: () => this.cycleSeason()
     });
 
     this.world = this.createWorld(true);
@@ -81,7 +91,7 @@ export class Game {
     this.camAnchor.set(this.world.player.x, 0, this.world.player.z);
     this.cameraSnap = true;
     this.bindEvents();
-    this.ui.setSeason(season);
+    this.applySeason(season);
     this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted);
     this.ui.showMenu();
     this.ui.updateHUD(0);
@@ -91,7 +101,7 @@ export class Game {
     requestAnimationFrame(this.loop);
 
     // Biome lab: a debug URL starts the run immediately, straight at the row.
-    if (boot.autostart || boot.biome !== undefined || boot.row !== undefined) {
+    if (!boot.noAutostart && (boot.autostart || boot.biome !== undefined || boot.row !== undefined)) {
       this.startRun();
     }
   }
@@ -104,7 +114,7 @@ export class Game {
       demoBiome,
       skin: save.data.skin,
       sceneView: this.sceneView,
-      seed: menu ? undefined : this.boot.seed,
+      seed: menu ? undefined : (this.benchSeed ?? this.boot.seed),
       startZ: menu ? undefined : this.boot.row,
       forceBiome: menu ? undefined : this.boot.biome,
       bot: menu ? undefined : this.boot.bot
@@ -124,9 +134,11 @@ export class Game {
 
   private startRun(): void {
     if (this.state === "playing" || this.state === "dying") return;
-    this.audio.init();
-    this.audio.setMusicDucked(false);
-    this.audio.startRun();
+    if (!this.benchMode) {
+      this.audio.init();
+      this.audio.setMusicDucked(false);
+      this.audio.startRun();
+    }
 
     this.world.dispose();
     this.world = this.createWorld(false);
@@ -137,7 +149,7 @@ export class Game {
     this.lastBiomeBoundary = this.world.getNextBiomeBoundary();
     this.lastBiomeId = this.world.getBiome().id;
     this.lastElite = this.world.getElite();
-    this.ui.setNight(this.lastElite);
+    if (!this.benchMode) this.ui.setNight(this.lastElite);
     this.score = this.world.getScore();
     this.biomesVisited.clear();
     this.biomesVisited.add(this.lastBiomeId);
@@ -147,15 +159,18 @@ export class Game {
     this.deathTimer = 0;
     this.demoDeathTimer = 0;
     this.deathData = null;
+    this.benchDeath = null;
     this.cameraSnap = true;
     this.pointer = null;
     this.camAnchor.set(this.world.player.x, 0, this.world.player.z);
-    this.ui.showPlaying();
-    this.ui.updateHUD(this.score);
-    this.ui.updateStats();
-    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted);
-    this.announceBiome();
-    this.ui.clearFocus();
+    if (!this.benchMode) {
+      this.ui.showPlaying();
+      this.ui.updateHUD(this.score);
+      this.ui.updateStats();
+      this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted);
+      this.announceBiome();
+      this.ui.clearFocus();
+    }
   }
 
   private announceBiome(): void {
@@ -221,6 +236,20 @@ export class Game {
     this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted);
     if (!this.audio.muted) this.audio.click();
     this.ui.showToast(this.audio.musicMuted ? "Музыка выключена" : "Музыка включена", 1300);
+  }
+
+  /** Menu button: Halloween → New Year → off. The choice survives reloads. */
+  private cycleSeason(): void {
+    const season = nextSeason(this.season);
+    this.season = season;
+    storeSeasonOverride(season);
+    this.applySeason(season);
+    this.audio.click();
+  }
+
+  private applySeason(season: SeasonId): void {
+    this.sceneView.setSeason(season);
+    this.ui.setSeason(season);
   }
 
   private selectSkin(skinId: SkinId): void {
@@ -308,6 +337,11 @@ export class Game {
       else if (this.state === "gameover") this.goMenu();
       return;
     }
+    if (code === "KeyH" && this.debug) {
+      event.preventDefault();
+      this.setHitboxes(!this.hitboxes);
+      return;
+    }
     if (this.state === "menu") {
       return;
     }
@@ -384,6 +418,17 @@ export class Game {
   private drainEvents(): void {
     if (this.world.events.length === 0) return;
     const events = this.world.events.splice(0, this.world.events.length);
+    if (this.benchMode) {
+      for (const event of events) {
+        if (event.type === "score") this.score = event.score;
+        else if (event.type === "death") {
+          this.benchDeath = { cause: event.cause, score: event.score };
+          this.score = event.score;
+          this.state = "gameover";
+        }
+      }
+      return;
+    }
     for (const event of events) {
       if (event.type === "hop") {
         this.audio.hop();
@@ -629,8 +674,9 @@ export class Game {
     const stats = this.world.getStats();
     const info = document.getElementById("debugInfo");
     if (info) {
-      info.textContent = `state ${this.state} · rows ${stats.rows} · cars ${stats.cars} · logs ${stats.logs} · props ${stats.props} · score ${this.score}`;
+      info.textContent = `state ${this.state} · rows ${stats.rows} · cars ${stats.cars} · logs ${stats.logs} · props ${stats.props} · score ${this.score}${this.hitboxes ? " · HITBOXES ON (H)" : ""}`;
     }
+    this.renderHitboxes();
   }
 
   setDebug(value: boolean): void {
@@ -645,6 +691,67 @@ export class Game {
       }
       el.style.display = "block";
     }
+  }
+
+  /** Draw projected collision footprints from `World.getDebugHitboxes()`. */
+  setHitboxes(value: boolean): void {
+    this.hitboxes = value;
+    if (value && !this.hitboxCanvas) {
+      const canvas = document.createElement("canvas");
+      canvas.id = "debugHitboxes";
+      canvas.style.cssText =
+        "position:fixed;inset:0;width:100%;height:100%;z-index:98;pointer-events:none";
+      document.body.appendChild(canvas);
+      this.hitboxCanvas = canvas;
+    }
+    if (!value && this.hitboxCanvas) {
+      this.hitboxCanvas.remove();
+      this.hitboxCanvas = null;
+    }
+  }
+
+  private renderHitboxes(): void {
+    const canvas = this.hitboxCanvas;
+    if (!this.hitboxes || !canvas) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const camera = this.getActiveCamera();
+    const v = new THREE.Vector3();
+    for (const box of this.world.getDebugHitboxes()) {
+      const corners: Array<[number, number]> = [];
+      let visible = true;
+      for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
+        v.set(box.x + sx * box.hx, 0.18, box.z + sz * box.hz).project(camera);
+        if (v.z < -1 || v.z > 1) {
+          visible = false;
+          break;
+        }
+        corners.push([(v.x * 0.5 + 0.5) * w, (-v.y * 0.5 + 0.5) * h]);
+      }
+      if (!visible) continue;
+      ctx.beginPath();
+      ctx.moveTo(corners[0][0], corners[0][1]);
+      for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i][0], corners[i][1]);
+      ctx.closePath();
+      ctx.globalAlpha = 0.16;
+      ctx.fillStyle = box.color;
+      ctx.fill();
+      ctx.globalAlpha = 0.92;
+      ctx.lineWidth = box.kind === "player" ? 2.2 : 1.3;
+      ctx.strokeStyle = box.color;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
   }
 
   getActiveCamera(): THREE.Camera {
@@ -677,6 +784,65 @@ export class Game {
 
   getScore(): number {
     return this.score;
+  }
+
+  getSeason(): SeasonId {
+    return this.season;
+  }
+
+  /**
+   * Run the autopilot synchronously without rendering. Used by the balance
+   * harness (100 runs per biome) and by `?bot=1` QA links.
+   */
+  benchRun(seconds = 30, seed?: number): {
+    biome: string;
+    biomeName: string;
+    seed: number;
+    score: number;
+    startScore: number;
+    gained: number;
+    coins: number;
+    dead: boolean;
+    cause: string | null;
+    elapsed: number;
+  } {
+    if (seed !== undefined) this.benchSeed = seed >>> 0;
+    this.benchMode = true;
+    const dt = 1 / 60;
+    let elapsed = 0;
+    try {
+      this.startRun();
+      const startScore = this.score;
+      const biome = this.world.getBiome().id;
+      const biomeName = this.world.getBiome().name;
+      const steps = Math.max(1, Math.ceil(seconds / dt));
+      for (let i = 0; i < steps; i++) {
+        elapsed += dt;
+        this.gameTime += dt;
+        this.world.update(dt, this.gameTime);
+        this.drainEvents();
+        if (this.state !== "playing" || this.world.player.dead) break;
+      }
+      const player = this.world.player;
+      this.score = Math.max(this.score, this.world.getScore());
+      const result = {
+        biome,
+        biomeName,
+        seed: this.benchSeed ?? 0,
+        score: this.score,
+        startScore,
+        gained: this.score - startScore,
+        coins: player.runCoins,
+        dead: this.benchDeath !== null || player.dead,
+        cause: this.benchDeath?.cause ?? player.deathCause,
+        elapsed: +elapsed.toFixed(2)
+      };
+      this.state = "gameover";
+      return result;
+    } finally {
+      this.benchMode = false;
+      if (this.state === "playing" || this.state === "dying") this.state = "gameover";
+    }
   }
 
   start(): void {

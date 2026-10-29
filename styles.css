@@ -606,7 +606,7 @@ button:focus-visible {
   flex: 0 0 auto;
 }
 
-/* ---------- Seasonal event badge ---------- */
+/* ---------- Seasonal event toggle ---------- */
 .season-chip {
   position: absolute;
   top: clamp(2px, 1.2vh, 12px);
@@ -626,9 +626,25 @@ button:focus-visible {
   line-height: 1;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: auto;
   user-select: none;
   transform: rotate(1.2deg);
+  transition: transform 120ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.season-chip:hover {
+  background: rgba(58, 43, 56, 0.72);
+  transform: rotate(1.2deg) translateY(-1px);
+}
+
+.season-chip:active {
+  transform: rotate(1.2deg) translateY(1px) scale(0.98);
+}
+
+.season-chip:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 3px;
 }
 
 .season-chip[hidden] {
@@ -649,6 +665,17 @@ button:focus-visible {
   text-shadow: 0 1px 2px rgba(30, 18, 20, 0.55);
 }
 
+.season-chip-cycle {
+  color: rgba(255, 247, 226, 0.56);
+  font-size: 13px;
+  line-height: 1;
+  transition: transform 200ms ease;
+}
+
+.season-chip:hover .season-chip-cycle {
+  transform: rotate(-120deg);
+}
+
 .season-chip[data-season="newyear"] {
   border-color: rgba(168, 216, 255, 0.6);
   background: rgba(18, 44, 64, 0.58);
@@ -656,6 +683,19 @@ button:focus-visible {
 
 .season-chip[data-season="newyear"] .season-chip-label {
   color: #b8ecff;
+}
+
+.season-chip[data-season="none"] {
+  border-color: rgba(255, 247, 226, 0.26);
+  background: rgba(18, 32, 32, 0.54);
+}
+
+.season-chip[data-season="none"] .season-chip-label {
+  color: rgba(255, 247, 226, 0.68);
+}
+
+.season-chip[data-season="none"] .season-chip-cycle {
+  color: rgba(255, 247, 226, 0.38);
 }
 
 @media (max-width: 520px) {
@@ -670,6 +710,9 @@ button:focus-visible {
   }
   .season-chip-label {
     font-size: 10px;
+  }
+  .season-chip-cycle {
+    font-size: 11px;
   }
 }
 

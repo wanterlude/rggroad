@@ -17,6 +17,7 @@ interface UIHandlers {
   onMusic: () => void;
   onSkin: (skin: SkinId) => void;
   onFavorite: (skin: SkinId) => void;
+  onSeason: () => void;
 }
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -48,7 +49,7 @@ export class UI {
     biomeBannerText: $("biomeBannerText"),
     menuBest: $("menuBest"),
     menuCoins: $("menuCoins"),
-    seasonChip: $("seasonChip"),
+    seasonChip: $<HTMLButtonElement>("seasonChip"),
     seasonChipLabel: $("seasonChipLabel"),
     skinRail: $("skinRail"),
     skinDock: $("skinDock"),
@@ -112,6 +113,7 @@ export class UI {
     refs.pauseSoundBtn.addEventListener("click", () => handlers.onSound());
     refs.menuMusicBtn.addEventListener("click", () => handlers.onMusic());
     refs.pauseMusicBtn.addEventListener("click", () => handlers.onMusic());
+    refs.seasonChip.addEventListener("click", () => handlers.onSeason());
     refs.pauseSoundBtn.setAttribute("aria-pressed", "false");
     refs.pauseMusicBtn.setAttribute("aria-pressed", "false");
     refs.skinPrev.addEventListener("click", () => this.scrollSkin(-1));
@@ -278,12 +280,19 @@ export class UI {
     this.refs.night.classList.toggle("is-night", night);
   }
 
-  /** Seasonal event badge in the menu; hidden outside Halloween/New Year. */
+  /** Seasonal event toggle in the menu; always visible, cycles H → NY → off. */
   setSeason(season: SeasonId): void {
     const info = SEASONS[season];
     const chip = this.refs.seasonChip;
-    chip.hidden = season === "none";
+    chip.hidden = false;
     chip.dataset.season = season;
+    chip.setAttribute(
+      "aria-label",
+      season === "none"
+        ? "Сезонное событие выключено. Включить Хэллоуин"
+        : `${info.label}. Переключить сезонное событие`
+    );
+    chip.title = season === "none" ? "Включить сезонное событие" : `Сейчас: ${info.label}`;
     this.refs.seasonChipLabel.textContent = info.label;
     document.documentElement.dataset.season = season;
   }

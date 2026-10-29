@@ -192,6 +192,16 @@ interface DemoPlanNode {
   first: DemoAction | null;
 }
 
+/** Axis-aligned collision footprint in world space, for the debug overlay. */
+export interface DebugHitbox {
+  x: number;
+  z: number;
+  hx: number;
+  hz: number;
+  color: string;
+  kind: string;
+}
+
 interface WorldOptions {
   menu: boolean;
   demo?: boolean;
@@ -307,7 +317,7 @@ export class World {
     if (wanted > 0) {
       let spawnZ = wanted;
       let spawnRow: Row | undefined;
-      for (let i = 0; i <= 9; i++) {
+      for (let i = 0; i <= 40; i++) {
         const candidate = this.rows.get(wanted - i);
         if (candidate && candidate.type === "grass") {
           spawnZ = candidate.z;
@@ -326,7 +336,10 @@ export class World {
           const fragile = (spawnRow.fragile ?? []).some((tile) => Math.abs(tile.x - x) < 0.8);
           const faller = (spawnRow.fallers ?? []).some((drop) => Math.abs(drop.x - x) < 0.8);
           const sink = (spawnRow.sinkholes ?? []).some((hole) => Math.abs(hole.x - x) < 0.8);
-          if (!blocked && !geyser && !fragile && !faller && !sink) {
+          const roller = (spawnRow.rollers ?? []).some(
+            (item) => Math.abs(item.x - x) < item.radius + 0.8
+          );
+          if (!blocked && !geyser && !fragile && !faller && !sink && !roller) {
             spawnX = x;
             break;
           }
@@ -2537,19 +2550,33 @@ export class World {
     const here = this.rows.get(Math.round(p.z));
     const sink = here?.sinkholes?.find((hole) => Math.abs(hole.x - p.x) < 0.5);
     if (sink) {
-      for (const action of [{ dx: 0, dz: 1 }, { dx: 1, dz: 0 }, { dx: -1, dz: 0 }]) {
+      for (const action of [
+        { dx: 0, dz: 1 },
+        { dx: 1, dz: 0 },
+        { dx: -1, dz: 0 },
+        { dx: 0, dz: -1 }
+      ]) {
         if (this.tryMove(action.dx, action.dz)) {
           this.demoMoveTimer = 0.1;
           return;
         }
       }
     }
-    const threat = here?.rollers?.find((roller) => Math.abs(roller.x - p.x) < 2.1);
+    const threat = here?.rollers?.find((roller) => Math.abs(roller.x - p.x) < 2.8);
     if (threat) {
       const away = Math.sign(p.x - threat.x) || 1;
-      if (this.tryMove(away, 0)) {
-        this.demoMoveTimer = 0.12;
-        return;
+      // Try both side steps, then a forward/back hop: a roller can pin the
+      // hero against the lane edge, and waiting there is a guaranteed hit.
+      for (const action of [
+        { dx: away, dz: 0 },
+        { dx: -away, dz: 0 },
+        { dx: 0, dz: 1 },
+        { dx: 0, dz: -1 }
+      ]) {
+        if (this.tryMove(action.dx, action.dz)) {
+          this.demoMoveTimer = 0.1;
+          return;
+        }
       }
     }
 
@@ -2653,7 +2680,8 @@ export class World {
           const targetRow = this.rows.get(targetZ);
           if (!targetRow) continue;
 
-          const landingStep = node.step + 3;
+          const landingStep =
+            node.step + Math.max(3, Math.ceil(this.demoHopSeconds() / DEMO_PLAN_STEP));
           if (landingStep > DEMO_PLAN_MAX_STEPS) continue;
           const startTime = node.step * DEMO_PLAN_STEP;
           const landingTime = landingStep * DEMO_PLAN_STEP;
@@ -2702,23 +2730,51 @@ export class World {
     return row.type === "grass" || (row.type === "water" && !!ride);
   }
 
+  /** Match the planner's landing window to the biome's real hop duration. */
+  private demoHopSeconds(): number {
+    const p = this.player;
+    const gravity = this.mechanicsAt(p.z).gravity ?? 1;
+    return HOP_DURATION * gravity * (p.slide ? 1.6 : 1) * (p.tarred ? 1.75 : 1);
+  }
+
   private demoGrassSafe(row: Row, x: number, time = 0): boolean {
     for (const prop of row.props) {
       if (prop.collider && Math.abs(prop.x - x) < prop.radius + 0.28) return false;
     }
     for (const geyser of row.geysers ?? []) {
-      if (Math.abs(geyser.x - x) < 0.65) return false;
+      if (Math.abs(geyser.x - x) >= 0.65) continue;
+      // A vent is only dangerous while it is warning or erupting. Use the
+      // actual phase so the bot can cross a field instead of freezing.
+      for (let t = time; t <= time + 0.35; t += 0.05) {
+        const cycle =
+          ((this.time + t + geyser.phase) % geyser.period + geyser.period) % geyser.period;
+        if (cycle >= geyser.period - GEYSER_ERUPT_SECONDS - GEYSER_WARN_SECONDS) return false;
+      }
     }
     for (const roller of row.rollers ?? []) {
-      const predicted = roller.x + roller.dir * roller.speed * time;
-      if (Math.abs(predicted - x) < roller.radius + 0.85) return false;
+      // Check a short window after landing, not just the exact frame: a log
+      // that arrives immediately afterwards would otherwise be a guaranteed
+      // hit while the hero is still recovering from the hop.
+      for (let t = time; t <= time + 0.4; t += 0.05) {
+        const predicted = roller.x + roller.dir * roller.speed * t;
+        if (Math.abs(predicted - x) < roller.radius + 0.85) return false;
+      }
     }
     for (const fragile of row.fragile ?? []) {
       if (Math.abs(fragile.x - x) < 0.7) return false;
     }
     for (const faller of row.fallers ?? []) {
-      if (Math.abs(faller.x - x) < 0.7) return false;
+      if (Math.abs(faller.x - x) >= 0.7) continue;
+      const local =
+        ((this.time + time + faller.phase) % faller.period + faller.period) % faller.period;
+      // The coconut only hurts during the fall/impact slice. Waiting for the
+      // whole cycle would strand the bot on a safe lane and feed the eagle.
+      if (local >= FALLER_WARN_SECONDS - 0.15 && local <= FALLER_WARN_SECONDS + FALLER_FALL_SECONDS + FALLER_IMPACT_SECONDS) {
+        return false;
+      }
     }
+    // Sinkholes are avoided while routing: the bot is not good at lingering
+    // next to them, and a wrong panic hop is worse than waiting for a lane.
     for (const sink of row.sinkholes ?? []) {
       if (Math.abs(sink.x - x) < 0.7) return false;
     }
@@ -2872,6 +2928,95 @@ export class World {
       this.sceneView.particles.burstFeathers(p.x, p.z, [skin.body, skin.bodyShade, skin.comb, 0xfff7e2]);
       this.sceneView.particles.burstDust(p.x, p.z, 10, 0xd8e8b6);
     }
+  }
+
+  /**
+   * Collision footprints near the player for `?hitboxes=1`. The shapes are
+   * approximate (the game uses forgiving circles and a few per-hazard checks),
+   * but they make the actual danger zones visible while tuning rows.
+   */
+  getDebugHitboxes(): DebugHitbox[] {
+    const boxes: DebugHitbox[] = [];
+    const p = this.player;
+    boxes.push({ x: p.x, z: p.z, hx: 0.34, hz: 0.34, color: "#5ff0a8", kind: "player" });
+
+    for (const row of this.rows.values()) {
+      if (row.z < p.z - 3 || row.z > p.z + 16) continue;
+
+      for (const prop of row.props) {
+        if (!prop.collider) continue;
+        boxes.push({
+          x: prop.x,
+          z: row.z,
+          hx: Math.max(0.28, prop.radius),
+          hz: Math.max(0.28, prop.radius),
+          color: "#ffd166",
+          kind: "prop"
+        });
+      }
+      for (const car of row.cars) {
+        if (Math.abs(car.x - p.x) > 13) continue;
+        boxes.push({
+          x: car.x,
+          z: row.z,
+          hx: car.len * 0.5,
+          hz: car.width * 0.5,
+          color: "#ff5d5d",
+          kind: "car"
+        });
+      }
+      for (const log of row.logs) {
+        if (Math.abs(log.x - p.x) > 11) continue;
+        boxes.push({
+          x: log.x,
+          z: row.z,
+          hx: log.len * 0.5,
+          hz: 0.45,
+          color: log.crocodile ? "#ff7b54" : "#66c7ff",
+          kind: "log"
+        });
+      }
+      if (row.train?.active) {
+        boxes.push({
+          x: row.train.x,
+          z: row.z,
+          hx: row.train.length * 0.5,
+          hz: 0.55,
+          color: "#ff3d6e",
+          kind: "train"
+        });
+      }
+      for (const geyser of row.geysers ?? []) {
+        boxes.push({ x: geyser.x, z: row.z, hx: 0.5, hz: 0.5, color: "#ff8a3d", kind: "geyser" });
+      }
+      for (const roller of row.rollers ?? []) {
+        boxes.push({
+          x: roller.x,
+          z: row.z,
+          hx: roller.radius,
+          hz: roller.radius,
+          color: "#ff9f43",
+          kind: roller.kind
+        });
+      }
+      for (const tile of row.fragile ?? []) {
+        boxes.push({
+          x: tile.x,
+          z: row.z,
+          hx: 0.45,
+          hz: 0.45,
+          color: tile.kind === "ghost" ? "#d8a0ff" : "#8b6ff0",
+          kind: "fragile"
+        });
+      }
+      for (const faller of row.fallers ?? []) {
+        boxes.push({ x: faller.x, z: row.z, hx: 0.42, hz: 0.42, color: "#c9e265", kind: "faller" });
+      }
+      for (const hole of row.sinkholes ?? []) {
+        boxes.push({ x: hole.x, z: row.z, hx: 0.48, hz: 0.48, color: "#9c7a4a", kind: "sink" });
+      }
+    }
+    return boxes;
   }
 
   getStats(): { rows: number; cars: number; logs: number; props: number } {

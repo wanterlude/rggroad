@@ -58,10 +58,16 @@ try {
     biome,
     bot: query.get("bot") === "1",
     autostart: query.get("start") === "1" || query.get("autoplay") === "1",
+    noAutostart: query.get("nostart") === "1",
     season
   });
   const debug = query.get("debug") === "1";
   game.setDebug(debug);
+  const hitboxes = query.get("hitboxes") === "1";
+  if (hitboxes) {
+    game.setDebug(true);
+    game.setHitboxes(true);
+  }
 
   const api = {
     start: () => game.start(),
@@ -76,6 +82,9 @@ try {
     },
     get score() {
       return game.getScore();
+    },
+    get season() {
+      return game.getSeason();
     },
     get sceneView() {
       return game.getSceneView();
@@ -98,7 +107,9 @@ try {
       game.getUI().updateHUD(game.getScore(), false, true);
     },
     projectPlayer: () => game.projectPlayer(),
+    benchRun: (seconds = 30, seed?: number) => game.benchRun(seconds, seed),
     setDebug: (value: boolean) => game.setDebug(value),
+    setHitboxes: (value: boolean) => game.setHitboxes(value),
     setIsoOverride: (value: {
       offX: number;
       offY: number;
