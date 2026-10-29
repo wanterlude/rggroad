@@ -91,6 +91,8 @@ const DEMO_PLAN_MAX_AHEAD = 7;
 const EAGLE_IDLE_SECONDS = 15;
 const EAGLE_WARNING_SECONDS = 10;
 const PLAYER_X_LIMIT = 30;
+/** How far trees, rocks and decorative props may spread across a row. */
+const PROP_SPAN = 30;
 // Geyser cycle: calm -> glowing warning (1.5 s) -> eruption (0.7 s) -> calm.
 const GEYSER_WARN_SECONDS = 1.5;
 const GEYSER_ERUPT_SECONDS = 0.7;
@@ -979,11 +981,11 @@ export class World {
 
   private addDecor(row: Row): void {
     const biome = BIOMES[row.biome];
-    const count = 3 + Math.floor(this.rng() * 4);
+    const count = 5 + Math.floor(this.rng() * 5);
     for (let i = 0; i < count; i++) {
       const kind = weightedPick(this.rng, biome.decorWeights).kind;
       row.decor.push({
-        x: rr(this.rng, -16, 16),
+        x: rr(this.rng, -PROP_SPAN, PROP_SPAN),
         dz: rr(this.rng, -0.42, 0.42),
         kind,
         scale: rr(this.rng, 0.8, 1.5),
@@ -1061,6 +1063,32 @@ export class World {
           collider: true,
           radius: 0.5,
           scale: rr(this.rng, 0.92, 1.2)
+        });
+      }
+    }
+
+    // Fill the rest of the row, not just the central play strip. Trees and
+    // rocks sit on both verges all the way to the edge of the lane; the inner
+    // path keeps the same 0–2 props, so the crossing still has a route.
+    for (const side of [-1, 1] as const) {
+      const outer = this.rng() < 0.8 ? 1 + Math.floor(this.rng() * 2) : 0;
+      for (let i = 0; i < outer; i++) {
+        const x = side * rr(this.rng, 10.2, PROP_SPAN);
+        if (row.props.some((p) => Math.abs(p.x - x) < 1.5)) continue;
+        const kind = weightedPick(this.rng, biome.propWeights).kind;
+        const radius =
+          kind === "tree" || kind === "pine" || kind === "cactus" ? 0.5 :
+          kind === "palm" || kind === "deadTree" || kind === "bush" ? 0.4 :
+          kind === "rock" || kind === "obelisk" || kind === "snowman" ? 0.45 :
+          kind === "ice" || kind === "crystal" || kind === "mushroom" ? 0.38 : 0.32;
+        row.props.push({
+          x,
+          z: row.z,
+          kind,
+          variant: Math.floor(this.rng() * 4),
+          collider: true,
+          radius,
+          scale: rr(this.rng, 0.88, 1.14)
         });
       }
     }
