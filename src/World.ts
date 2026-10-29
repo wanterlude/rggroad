@@ -15,12 +15,22 @@ import {
   type SkinId,
   type VehicleType
 } from "./config";
-import { biomeForZ, BIOMES, BIOME_ORDER, BIOME_SPAN, type BiomeDecorKind, type BiomeDef, type BiomeMechanics } from "./biomes";
+import {
+  biomeForZ,
+  BIOMES,
+  BIOME_ORDER,
+  BIOME_SPAN,
+  type BiomeDecorKind,
+  type BiomeDef,
+  type BiomeId,
+  type BiomeMechanics
+} from "./biomes";
 import type {
   CarData,
   CoinData,
   DeathCause,
   GameEvent,
+  GeyserData,
   LogData,
   PlayerState,
   PropData,
@@ -69,6 +79,11 @@ const DEMO_PLAN_MAX_AHEAD = 7;
 const EAGLE_IDLE_SECONDS = 15;
 const EAGLE_WARNING_SECONDS = 10;
 const PLAYER_X_LIMIT = 30;
+// Geyser cycle: calm -> glowing warning (1.5 s) -> eruption (0.7 s) -> calm.
+const GEYSER_WARN_SECONDS = 1.5;
+const GEYSER_ERUPT_SECONDS = 0.7;
+const geyserRingGeometry = new THREE.RingGeometry(0.24, 0.44, 24);
+const geyserVentGeometry = new THREE.CircleGeometry(0.24, 20);
 
 const DEFAULT_MECHANICS: BiomeMechanics = {
   speed: 1,
@@ -101,6 +116,14 @@ interface WorldOptions {
   demoBiome?: number;
   skin: SkinId;
   sceneView: SceneView;
+  /** Deterministic seed override (used by ?seed=). */
+  seed?: number;
+  /** Start the run at this row (used by ?row=). */
+  startZ?: number;
+  /** Force every row of the run into this biome (used by ?biome=). */
+  forceBiome?: BiomeId;
+  /** Let the autopilot drive the player during a normal run (used by ?bot=1). */
+  bot?: boolean;
 }
 
 export class World {
@@ -129,10 +152,16 @@ export class World {
   private idleHazard: THREE.Group | null = null;
   private idleHazardTime = 0;
   private eagleWarnSecond = -1;
+  private readonly forceBiomeId: BiomeId | null;
+  private readonly botEnabled: boolean;
+  private readonly debugStart: number;
 
   constructor(seed: number, options: WorldOptions) {
-    this.rng = mulberry32(seed >>> 0 || 1);
+    this.rng = mulberry32((options.seed ?? seed) >>> 0 || 1);
     this.mode = options.demo ? "demo" : options.menu ? "menu" : "run";
+    this.forceBiomeId = options.forceBiome ?? null;
+    this.botEnabled = options.bot === true;
+    this.debugStart = options.startZ ?? 0;
     this.demoBiomeIndex = options.demoBiome ?? 0;
     this.skinId = options.skin;
     this.sceneView = options.sceneView;
@@ -159,7 +188,10 @@ export class World {
       runCoins: 0,
       squash: 1,
       bumpT: 0,
-      idlePhase: this.rng() * Math.PI * 2
+      idlePhase: this.rng() * Math.PI * 2,
+      lastDx: 0,
+      lastDz: 1,
+      slide: false
     };
 
     for (let z = -38; z <= 2; z++) {
@@ -175,6 +207,45 @@ export class World {
     this.frontier = 2;
     this.generateAhead(35);
 
+    // Debug launches (?row=) jump straight to a biome: generate up to the
+    // requested position, then spawn on the nearest safe grass row.
+    const wanted = this.debugStart > 0 ? Math.min(Math.floor(this.debugStart), 480) : 0;
+    if (wanted > 2) this.generateAhead(wanted + GEN_AHEAD);
+    if (wanted > 0) {
+      let spawnZ = wanted;
+      let spawnRow: Row | undefined;
+      for (let i = 0; i <= 9; i++) {
+        const candidate = this.rows.get(wanted - i);
+        if (candidate && candidate.type === "grass") {
+          spawnZ = candidate.z;
+          spawnRow = candidate;
+          break;
+        }
+      }
+      const offsets = [0, 1, -1, 2, -2, 3, -3, 4, -4];
+      let spawnX = 0;
+      if (spawnRow) {
+        for (const x of offsets) {
+          const blocked = spawnRow.props.some(
+            (prop) => prop.collider && Math.abs(prop.x - x) < prop.radius + 0.32
+          );
+          const geyser = (spawnRow.geysers ?? []).some((g) => Math.abs(g.x - x) < 0.8);
+          if (!blocked && !geyser) {
+            spawnX = x;
+            break;
+          }
+        }
+      }
+      const p = this.player;
+      p.x = spawnX;
+      p.z = spawnZ;
+      p.fromX = spawnX;
+      p.fromZ = spawnZ;
+      p.toX = spawnX;
+      p.toZ = spawnZ;
+      this.maxZ = spawnZ;
+    }
+
     this.playerGroup = buildCharacter(this.skinId);
     this.playerGroup.position.set(this.player.x, 0, this.player.z);
     this.root.add(this.playerGroup);
@@ -184,6 +255,11 @@ export class World {
 
   getMode(): "menu" | "run" | "demo" {
     return this.mode;
+  }
+
+  /** True when the run was launched from a debug URL and must not touch records. */
+  isDebugRun(): boolean {
+    return this.debugStart > 0 || this.forceBiomeId !== null;
   }
 
   getBiome() {
@@ -197,6 +273,7 @@ export class World {
   }
 
   private biomeAt(z: number) {
+    if (this.forceBiomeId) return BIOMES[this.forceBiomeId];
     if (this.mode !== "demo") return biomeForZ(z);
     const demoZ = Math.max(0, z);
     const index =
@@ -291,6 +368,37 @@ export class World {
     if (propsMesh) {
       row.propsMesh = propsMesh;
       row.group.add(propsMesh);
+    }
+
+    for (const geyser of row.geysers ?? []) {
+      const ring = new THREE.Mesh(
+        geyserRingGeometry,
+        new THREE.MeshBasicMaterial({
+          color: 0xff8a3d,
+          transparent: true,
+          opacity: 0.25,
+          depthWrite: false,
+          side: THREE.DoubleSide
+        })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(geyser.x, 0.024, 0);
+      ring.renderOrder = 4;
+      const vent = new THREE.Mesh(
+        geyserVentGeometry,
+        new THREE.MeshBasicMaterial({
+          color: 0x3a1c12,
+          transparent: true,
+          opacity: 0.72,
+          depthWrite: false
+        })
+      );
+      vent.rotation.x = -Math.PI / 2;
+      vent.position.set(geyser.x, 0.022, 0);
+      vent.renderOrder = 3;
+      row.group.add(vent, ring);
+      geyser.ring = ring;
+      geyser.vent = vent;
     }
 
     if (row.type === "water") {
@@ -421,8 +529,34 @@ export class World {
     row.variant = Math.floor(this.rng() * 4);
     this.addDecor(row);
     if (options.allowProps) this.addProps(row);
+    if (this.mechanicsAt(z).geysers && this.mode !== "menu" && this.rng() < 0.78) {
+      this.addGeysers(row);
+    }
     if (options.allowCoin) this.addCoin(row, 0.4, -3.8, 3.8);
     return row;
+  }
+
+  /** Lava ground vents. They sit on walkable cells and telegraph before firing. */
+  private addGeysers(row: Row): void {
+    const count = this.rng() < 0.55 ? 1 : 2;
+    const lane = [-3, -2, -1, 0, 1, 2, 3];
+    for (let i = lane.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      const swap = lane[i];
+      lane[i] = lane[j];
+      lane[j] = swap;
+    }
+    const geysers: GeyserData[] = [];
+    for (const x of lane) {
+      if (geysers.length >= count) break;
+      if (row.props.some((prop) => prop.collider && Math.abs(prop.x - x) < prop.radius + 0.55)) continue;
+      geysers.push({
+        x,
+        phase: this.rng() * 6,
+        period: 4.6 + this.rng() * 1.4
+      });
+    }
+    if (geysers.length > 0) row.geysers = geysers;
   }
 
   private addDecor(row: Row): void {
@@ -519,6 +653,7 @@ export class World {
     for (let attempt = 0; attempt < 5; attempt++) {
       const x = Math.round(rr(this.rng, minX, maxX) * 2) / 2;
       if (row.props.some((p) => p.collider && Math.abs(p.x - x) < 1.05)) continue;
+      if (row.geysers?.some((g) => Math.abs(g.x - x) < 0.75)) continue;
       row.coin = {
         x,
         z: row.z,
@@ -678,8 +813,11 @@ export class World {
     this.time = time;
     this.ensureRowsAround(this.player.z);
     this.updateTraffic(dt);
-    if (this.mode === "demo" && !this.player.dead) this.updateDemoBot(dt);
+    if ((this.mode === "demo" || (this.mode === "run" && this.botEnabled)) && !this.player.dead) {
+      this.updateDemoBot(dt);
+    }
     this.updatePlayer(dt, time);
+    this.updateGeysers(dt, time);
     this.updateIdleHazard(dt);
     this.updateCoins(time);
     this.updateRowVisibility();
@@ -781,6 +919,69 @@ export class World {
     updateRailGlows(row, this.time);
   }
 
+  private updateGeysers(dt: number, time: number): void {
+    if (this.mode === "menu") return;
+    const p = this.player;
+    if (p.dead) return;
+    const nearMin = p.z - 7;
+    const nearMax = p.z + 22;
+
+    for (const row of this.rows.values()) {
+      if (!row.geysers || row.z < nearMin || row.z > nearMax) continue;
+      for (const geyser of row.geysers) {
+        const cycle = ((time + geyser.phase) % geyser.period + geyser.period) % geyser.period;
+        const eruptStart = geyser.period - GEYSER_ERUPT_SECONDS;
+        const warnStart = eruptStart - GEYSER_WARN_SECONDS;
+        const erupting = cycle >= eruptStart;
+
+        if (geyser.ring) {
+          const material = geyser.ring.material as THREE.MeshBasicMaterial;
+          if (cycle >= warnStart) {
+            const k = (cycle - warnStart) / GEYSER_WARN_SECONDS;
+            const pulse = 0.5 + Math.abs(Math.sin(cycle * (7 + k * 9))) * 0.5;
+            geyser.ring.scale.setScalar(1 + k * 0.5 + (erupting ? 0.35 : 0));
+            material.opacity = 0.3 + pulse * 0.6;
+          } else {
+            geyser.ring.scale.setScalar(1);
+            material.opacity = 0.2;
+          }
+        }
+
+        if (erupting && !geyser.erupting) {
+          geyser.erupting = true;
+          const distance = Math.abs(row.z - p.z);
+          if (distance < 11) {
+            this.events.push({ type: "geyser", volume: clamp(0.1 - distance * 0.008, 0.02, 0.1) });
+            this.shake = Math.max(this.shake, 0.24);
+          }
+        } else if (!erupting) {
+          geyser.erupting = false;
+        }
+
+        if (!erupting || Math.abs(row.z - p.z) > 14) continue;
+        if (Math.random() < Math.min(1, dt * 22)) {
+          this.sceneView.particles.spawn({
+            x: geyser.x + (Math.random() - 0.5) * 0.5,
+            y: 0.05,
+            z: row.z + (Math.random() - 0.5) * 0.5,
+            vx: (Math.random() - 0.5) * 0.7,
+            vy: 2.2 + Math.random() * 2.8,
+            vz: (Math.random() - 0.5) * 0.7,
+            gravity: 6.5,
+            life: 0.32 + Math.random() * 0.3,
+            size: 0.05 + Math.random() * 0.09,
+            color: Math.random() < 0.4 ? 0xffe08a : 0xff7a2a,
+            spin: 6
+          });
+        }
+        if (Math.abs(p.z - row.z) < 0.64 && Math.abs(p.x - geyser.x) < 0.52 && p.y < 1.2) {
+          this.die("geyser");
+          return;
+        }
+      }
+    }
+  }
+
   private updatePlayer(dt: number, time: number): void {
     const p = this.player;
 
@@ -804,12 +1005,16 @@ export class World {
     p.squash = damp(p.squash, 1, 11, dt);
 
     if (p.hopping) {
-      p.hopT += dt / HOP_DURATION;
+      const mechanics = this.mechanicsAt(p.z);
+      const gravity = mechanics.gravity ?? 1;
+      // Low gravity stretches the arc; a slide is a fast, low glide.
+      const duration = HOP_DURATION * gravity * (p.slide ? 1.6 : 1);
+      p.hopT += dt / duration;
       const t = clamp(p.hopT, 0, 1);
       const eased = t * t * (3 - 2 * t);
       p.x = lerp(p.fromX, p.toX, eased);
       p.z = lerp(p.fromZ, p.toZ, eased);
-      p.y = Math.sin(t * Math.PI) * HOP_HEIGHT;
+      p.y = Math.sin(t * Math.PI) * HOP_HEIGHT * Math.sqrt(gravity) * (p.slide ? 0.55 : 1);
       if (t >= 1) this.land();
     } else {
       p.y = 0;
@@ -947,6 +1152,9 @@ export class World {
     p.hopT = 0;
     p.hopping = true;
     p.ridingLog = null;
+    p.lastDx = dx;
+    p.lastDz = dz;
+    p.slide = false;
     p.targetYaw = Math.atan2(dx, dz) + 0.14;
     p.squash = 0.82;
     p.queued = null;
@@ -962,6 +1170,8 @@ export class World {
 
   private land(): void {
     const p = this.player;
+    const wasSlide = p.slide;
+    p.slide = false;
     p.hopping = false;
     p.hopT = 1;
     p.x = p.toX;
@@ -1009,11 +1219,54 @@ export class World {
     this.ensureRowsAround(p.z);
     if (!p.dead) this.checkCollisions();
 
+    // Frost: the landing carries the hero one more cell in the hop direction.
+    // Only the first landing of a player-made hop slides, so ice cannot chain.
+    if (
+      !p.dead &&
+      !p.queued &&
+      !wasSlide &&
+      this.mode !== "menu" &&
+      row.type === "grass" &&
+      this.mechanicsAt(p.z).slide
+    ) {
+      this.startSlide();
+      return;
+    }
+
     if (!p.dead && p.queued) {
       const queued = p.queued;
       p.queued = null;
       this.tryMove(queued.dx, queued.dz);
     }
+  }
+
+  /** Frost: keep gliding one cell in the direction of the last hop. */
+  private startSlide(): void {
+    const p = this.player;
+    const dx = p.lastDx;
+    const dz = p.lastDz;
+    if (!dx && !dz) return;
+    const targetX = p.x + dx;
+    const targetZ = p.z + dz;
+    if (Math.abs(targetX) > PLAYER_X_LIMIT) return;
+    const row = this.rows.get(targetZ);
+    if (!row || row.type !== "grass") return;
+    if (row.props.some((prop) => prop.collider && Math.abs(prop.x - targetX) < prop.radius + 0.28)) return;
+    if ((row.geysers ?? []).some((g) => Math.abs(g.x - targetX) < 0.7)) return;
+
+    p.fromX = p.x;
+    p.fromZ = p.z;
+    p.toX = targetX;
+    p.toZ = targetZ;
+    p.hopT = 0;
+    p.hopping = true;
+    p.ridingLog = null;
+    p.slide = true;
+    p.targetYaw = Math.atan2(dx, dz) + 0.14;
+    p.squash = 0.9;
+    p.queued = null;
+    this.sceneView.particles.burstDust(p.x, p.z, 6, 0xdff4ff);
+    this.events.push({ type: "hop" });
   }
 
   private updateIdleHazard(dt: number): void {
@@ -1223,6 +1476,9 @@ export class World {
     for (const prop of row.props) {
       if (prop.collider && Math.abs(prop.x - x) < prop.radius + 0.28) return false;
     }
+    for (const geyser of row.geysers ?? []) {
+      if (Math.abs(geyser.x - x) < 0.65) return false;
+    }
     return true;
   }
 
@@ -1329,6 +1585,11 @@ export class World {
       this.shake = Math.max(this.shake, 0.45);
       this.sceneView.particles.burstSplash(p.x, p.z);
       this.shadow.visible = false;
+    } else if (cause === "geyser") {
+      this.shake = Math.max(this.shake, 0.8);
+      const skin = SKINS[this.skinId];
+      this.sceneView.particles.burstDust(p.x, p.z, 16, 0xff8a3d);
+      this.sceneView.particles.burstFeathers(p.x, p.z, [0xffb35c, 0xff7a2a, 0xffe08a, skin.body]);
     } else {
       this.shake = Math.max(this.shake, cause === "train" ? 1.05 : 0.7);
       const skin = SKINS[this.skinId];

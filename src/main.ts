@@ -1,5 +1,6 @@
 import "../styles.css";
 import { Game } from "./Game";
+import { BIOME_ORDER, type BiomeId } from "./biomes";
 import { save } from "./save";
 import { setMoryakaEyeVariant } from "./Models";
 
@@ -39,7 +40,21 @@ try {
   if (eyesParam !== null && Number.isFinite(Number(eyesParam))) {
     setMoryakaEyeVariant(Number(eyesParam) - 1);
   }
-  const game = new Game(canvas);
+
+  // Biome lab: ?biome=frost&row=120&seed=42&bot=1 opens the run on that row.
+  const seedRaw = query.get("seed");
+  const rowRaw = query.get("row");
+  const biomeRaw = query.get("biome");
+  const seed = seedRaw !== null && Number.isFinite(Number(seedRaw)) ? Math.max(0, Math.trunc(Number(seedRaw))) : undefined;
+  const row = rowRaw !== null && Number.isFinite(Number(rowRaw)) ? Math.max(0, Math.trunc(Number(rowRaw))) : undefined;
+  const biome = biomeRaw !== null && (BIOME_ORDER as string[]).includes(biomeRaw) ? (biomeRaw as BiomeId) : undefined;
+  const game = new Game(canvas, {
+    seed,
+    row,
+    biome,
+    bot: query.get("bot") === "1",
+    autostart: query.get("start") === "1" || query.get("autoplay") === "1"
+  });
   const debug = query.get("debug") === "1";
   game.setDebug(debug);
 

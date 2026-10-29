@@ -35,6 +35,12 @@ export interface BiomeMechanics {
   police: boolean;
   idle: IdleHazardKind;
   stampede: boolean;
+  /** Frost: landing on a grass row slides one extra cell in the same direction. */
+  slide?: boolean;
+  /** Lava: timed ground geysers with a glowing telegraph. */
+  geysers?: boolean;
+  /** Jump duration multiplier. 1.55 = floaty low-gravity hops. */
+  gravity?: number;
 }
 
 export type BiomePropKind =
@@ -570,8 +576,8 @@ const BASE_MECHANICS: Record<BaseBiomeId, BiomeMechanics> = {
   forest: { speed: 1.02, road: 0.42, river: 0.22, rail: 0.13, water: "logs", police: false, idle: "eagle", stampede: false },
   desert: { speed: 1.08, road: 0.5, river: 0.12, rail: 0.12, water: "crocodile", police: false, idle: "eagle", stampede: false },
   ocean: { speed: 0.98, road: 0.3, river: 0.37, rail: 0.1, water: "logs", police: false, idle: "eagle", stampede: false },
-  frost: { speed: 1.06, road: 0.38, river: 0.26, rail: 0.12, water: "ice", police: false, idle: "eagle", stampede: false },
-  lava: { speed: 1.25, road: 0.42, river: 0.23, rail: 0.13, water: "logs", police: false, idle: "eagle", stampede: false },
+  frost: { speed: 1.06, road: 0.38, river: 0.26, rail: 0.12, water: "ice", police: false, idle: "eagle", stampede: false, slide: true },
+  lava: { speed: 1.25, road: 0.42, river: 0.23, rail: 0.13, water: "logs", police: false, idle: "eagle", stampede: false, geysers: true },
   void: { speed: 1.32, road: 0.43, river: 0.24, rail: 0.14, water: "ice", police: false, idle: "ufo", stampede: false }
 };
 
@@ -739,7 +745,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
       { kind: "pebble", weight: 0.4 },
       { kind: "tuft", weight: 0.08 }
     ],
-    mechanics: { speed: 1.26, road: 0.44, river: 0.2, rail: 0.14, water: "ice", police: false, idle: "ufo", stampede: false }
+    mechanics: { speed: 1.26, road: 0.44, river: 0.2, rail: 0.14, water: "ice", police: false, idle: "ufo", stampede: false, gravity: 1.55 }
   }),
   candy: variant("candy", "СЛАДОСТИ", "autumn", {
     grass: [0xf0a9c2, 0xe89ab6, 0xf7bbd0],
@@ -872,13 +878,13 @@ export const BIOME_DESCRIPTIONS: Record<BiomeId, string> = {
   forest: "Брёвна, густой лес и орёл. Дороги реже, но расслабляться нельзя.",
   desert: "Больше дорог, крокодилы в воде и жара. Держи темп.",
   ocean: "Много рек: прыгай по брёвнам и не дай унести себя.",
-  frost: "Ледяные реки и льдины вместо брёвен. Прыгай точнее.",
-  lava: "Самый быстрый трафик в игре. Ошибок не прощает.",
+  frost: "Скользко: после приземления тебя проносит ещё на клетку. Тормози заранее и не прыгай впритык.",
+  lava: "Гейзеры: из трещин бьёт огонь. Пульсирующее кольцо — предупреждение, уходи с клетки.",
   void: "Финал цикла: НЛО вместо орла и ледяные реки.",
   savanna: "Стервятник кружит сверху, в воде крокодилы. Не останавливайся.",
   jungle: "Много воды и лилий — прыгай по островкам.",
   city: "Плотный поток и полицейские машины. Смотри на оба ряда.",
-  space: "НЛО и ледяные глыбы вместо рек. Держи ритм.",
+  space: "Низкая гравитация: прыжок дольше и выше. Держи ритм и рассчитывай траекторию.",
   candy: "Шоколадные реки и конфетный самолёт. Сладко и опасно.",
   prehistoric: "Стампида вместо поездов и птеродактиль. Слушай гул земли.",
   halloween: "Летучая мышь и туман. Не оглядывайся.",

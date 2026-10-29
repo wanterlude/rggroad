@@ -4,7 +4,7 @@ import type { BiomeDecorKind, BiomeId, BiomePropKind } from "./biomes";
 
 export type GameState = "menu" | "playing" | "paused" | "dying" | "gameover";
 export type RowType = "grass" | "road" | "water" | "rail";
-export type DeathCause = "car" | "train" | "water" | "eagle" | "crocodile";
+export type DeathCause = "car" | "train" | "water" | "eagle" | "crocodile" | "geyser";
 
 export interface SaveData {
   best: number;
@@ -14,6 +14,8 @@ export interface SaveData {
   muted: boolean;
   musicMuted: boolean;
   runs: number;
+  /** 2 = first five heroes are free, the rest cost 10 coins. */
+  economyVersion: number;
 }
 
 export interface CubeSpec {
@@ -101,6 +103,15 @@ export interface TrainData {
   group?: THREE.Group;
 }
 
+export interface GeyserData {
+  x: number;
+  phase: number;
+  period: number;
+  ring?: THREE.Mesh;
+  vent?: THREE.Mesh;
+  erupting?: boolean;
+}
+
 export interface Row {
   z: number;
   type: RowType;
@@ -113,6 +124,7 @@ export interface Row {
   coin: CoinData | null;
   cars: CarData[];
   logs: LogData[];
+  geysers?: GeyserData[];
   signs: SignData[];
   train: TrainData | null;
   dir: 1 | -1;
@@ -145,6 +157,9 @@ export interface PlayerState {
   squash: number;
   bumpT: number;
   idlePhase: number;
+  lastDx: number;
+  lastDz: number;
+  slide: boolean;
 }
 
 export type GameEvent =
@@ -155,4 +170,5 @@ export type GameEvent =
   | { type: "score"; score: number }
   | { type: "horn"; volume: number }
   | { type: "eagle-warning"; seconds: number }
+  | { type: "geyser"; volume: number }
   | { type: "death"; cause: DeathCause; score: number; coins: number };

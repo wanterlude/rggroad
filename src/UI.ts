@@ -293,7 +293,9 @@ export class UI {
             ? "КАР-Р-Р!"
             : options.cause === "crocodile"
               ? "ХРУМ!"
-              : "БУМ!";
+              : options.cause === "geyser"
+                ? "ПШШ!"
+                : "БУМ!";
     const message =
       options.cause === "water"
         ? "Бревно уплыло. В следующий раз прыгай точнее."
@@ -303,7 +305,9 @@ export class UI {
             ? "Нельзя стоять на месте слишком долго — тебя унесёт."
             : options.cause === "crocodile"
               ? "Крокодил не любит, когда прыгают ему на голову."
-              : "Машины не тормозят. Проверь оба ряда.";
+              : options.cause === "geyser"
+                ? "Гейзер не ждёт. Уходи с клетки, как только загорелось кольцо."
+                : "Машины не тормозят. Проверь оба ряда.";
     this.refs.overTitle.textContent = title;
     this.refs.overMessage.textContent = message;
     this.refs.finalScore.textContent = fmt(options.score);
@@ -411,7 +415,15 @@ export class UI {
       card.setAttribute("aria-pressed", String(isSelected));
       card.setAttribute(
         "aria-label",
-        `${skin.name}${isSelected ? ", выбран" : unlocked ? ", доступен" : `, стоит ${skin.cost} монет`}`
+        `${skin.name}${
+          isSelected
+            ? ", выбран"
+            : unlocked
+              ? ", доступен"
+              : skin.cost > 0
+                ? `, стоит ${skin.cost} монет`
+                : ", бесплатный"
+        }`
       );
       if (isSelected) card.classList.add("is-selected");
       if (!unlocked) card.classList.add("is-locked");
@@ -448,6 +460,7 @@ export class UI {
       cost.className = "char-cost";
       if (isSelected) cost.textContent = "ВЫБРАНО";
       else if (unlocked) cost.textContent = "ВЫБРАТЬ";
+      else if (skin.cost === 0) cost.textContent = "БЕСПЛАТНО";
       else cost.innerHTML = `<span class="coin-icon" aria-hidden="true"></span><span>${skin.cost}</span>`;
       card.appendChild(cost);
 

@@ -48,7 +48,7 @@ export const SKINS: Record<SkinId, SkinDef> = {
   snezha: {
     id: "snezha",
     name: "Snezha_mrr",
-    cost: 0,
+    cost: 10,
     style: "snezha",
     badge: "Звёздная кошка",
     body: 0xffe6d8,
@@ -67,7 +67,7 @@ export const SKINS: Record<SkinId, SkinDef> = {
   meowlody: {
     id: "meowlody",
     name: "Meowlody Note",
-    cost: 0,
+    cost: 10,
     style: "meowlody",
     badge: "Мелодия",
     body: 0xffe6d8,
@@ -86,7 +86,7 @@ export const SKINS: Record<SkinId, SkinDef> = {
   miliray: {
     id: "miliray",
     name: "Miliray Brick",
-    cost: 0,
+    cost: 10,
     style: "miliray",
     badge: "Готика",
     body: 0xffe6d8,
@@ -105,7 +105,7 @@ export const SKINS: Record<SkinId, SkinDef> = {
   yuchii: {
     id: "yuchii",
     name: "Yuchii_Yu",
-    cost: 0,
+    cost: 10,
     style: "yuchii",
     badge: "Птичка",
     body: 0xffe6d8,
@@ -124,7 +124,7 @@ export const SKINS: Record<SkinId, SkinDef> = {
   alaskanyan: {
     id: "alaskanyan",
     name: "Alaskanyan",
-    cost: 0,
+    cost: 10,
     style: "alaskanyan",
     badge: "Белая кошка",
     body: 0xffe6d8,
@@ -143,7 +143,7 @@ export const SKINS: Record<SkinId, SkinDef> = {
   alysque: {
     id: "alysque",
     name: "aLySQuE",
-    cost: 0,
+    cost: 10,
     style: "alysque",
     badge: "Демон",
     body: 0xffe6d8,
@@ -162,7 +162,7 @@ export const SKINS: Record<SkinId, SkinDef> = {
   amelia: {
     id: "amelia",
     name: "AmeliaLavert",
-    cost: 0,
+    cost: 10,
     style: "amelia",
     badge: "Вампир",
     body: 0xffe6d8,
@@ -181,7 +181,7 @@ export const SKINS: Record<SkinId, SkinDef> = {
   nyamuras: {
     id: "nyamuras",
     name: "Nyamuras",
-    cost: 0,
+    cost: 10,
     style: "nyamuras",
     badge: "Фермер",
     body: 0xffe6d8,
@@ -200,7 +200,7 @@ export const SKINS: Record<SkinId, SkinDef> = {
   knjazevdesu: {
     id: "knjazevdesu",
     name: "Knjazevdesu",
-    cost: 0,
+    cost: 10,
     style: "knjazevdesu",
     badge: "Геймер",
     body: 0x3fc7b4,

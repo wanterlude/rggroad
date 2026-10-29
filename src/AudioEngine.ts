@@ -221,6 +221,12 @@ export class AudioEngine {
     this.tone({ frequency: 390, endFrequency: 210, duration: 0.13, type: "square", volume: 0.035, delay: 0.03 });
   }
 
+  geyser(volume = 0.05): void {
+    const level = clamp(volume, 0.01, 0.12);
+    this.noise({ duration: 0.38, volume: level, filterType: "bandpass", frequency: 320, endFrequency: 1100, q: 1.2 });
+    this.tone({ frequency: 92, endFrequency: 52, duration: 0.32, type: "sawtooth", volume: level * 0.55 });
+  }
+
   splash(): void {
     this.noise({ duration: 0.34, volume: 0.14, filterType: "bandpass", frequency: 1500, endFrequency: 260, q: 0.7 });
     this.tone({ frequency: 420, endFrequency: 120, duration: 0.24, type: "sine", volume: 0.055 });

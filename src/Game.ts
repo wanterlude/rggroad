@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { SKINS, type SkinId } from "./config";
+import type { BiomeId } from "./biomes";
 import { SceneView } from "./SceneView";
 import { World } from "./World";
 import { AudioEngine } from "./AudioEngine";
@@ -9,6 +10,14 @@ import type { GameEvent, GameState } from "./types";
 import { clamp, damp } from "./utils";
 
 const makeSeed = (): number => ((Date.now() & 0x7fffffff) ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
+
+export interface GameBootOptions {
+  seed?: number;
+  row?: number;
+  biome?: BiomeId;
+  bot?: boolean;
+  autostart?: boolean;
+}
 
 interface IsoCameraOverride {
   offX: number;
@@ -43,8 +52,11 @@ export class Game {
   private pointer: { id: number; x: number; y: number; time: number } | null = null;
   private debug = false;
   private isoOverride: IsoCameraOverride | null = null;
+  private readonly boot: GameBootOptions;
+  private debugRun = false;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, boot: GameBootOptions = {}) {
+    this.boot = boot;
     this.sceneView = new SceneView(canvas);
     this.ui = new UI({
       onPlay: () => this.startRun(),
@@ -69,6 +81,11 @@ export class Game {
     this.ui.renderSkinCards();
     this.lastFrame = performance.now();
     requestAnimationFrame(this.loop);
+
+    // Biome lab: a debug URL starts the run immediately, straight at the row.
+    if (boot.autostart || boot.biome !== undefined || boot.row !== undefined) {
+      this.startRun();
+    }
   }
 
   private createWorld(menu: boolean): World {
@@ -78,7 +95,11 @@ export class Game {
       demo: menu,
       demoBiome,
       skin: save.data.skin,
-      sceneView: this.sceneView
+      sceneView: this.sceneView,
+      seed: menu ? undefined : this.boot.seed,
+      startZ: menu ? undefined : this.boot.row,
+      forceBiome: menu ? undefined : this.boot.biome,
+      bot: menu ? undefined : this.boot.bot
     });
   }
 
@@ -104,9 +125,10 @@ export class Game {
     this.sceneView.setEnvironmentVisible(false);
     this.sceneView.particles.clear();
     this.state = "playing";
-    this.lastBiomeBoundary = 0;
+    this.debugRun = this.world.isDebugRun();
+    this.lastBiomeBoundary = this.world.getNextBiomeBoundary();
     this.lastBiomeId = this.world.getBiome().id;
-    this.score = 0;
+    this.score = this.world.getScore();
     this.startingBest = save.data.best;
     this.newBestShown = false;
     this.deathTimer = 0;
@@ -116,7 +138,7 @@ export class Game {
     this.pointer = null;
     this.camAnchor.set(this.world.player.x, 0, this.world.player.z);
     this.ui.showPlaying();
-    this.ui.updateHUD(0);
+    this.ui.updateHUD(this.score);
     this.ui.updateStats();
     this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted);
     this.announceBiome();
@@ -343,15 +365,17 @@ export class Game {
       } else if (event.type === "bump") {
         this.audio.bump();
       } else if (event.type === "coin") {
-        save.data.coins += event.amount;
-        save.write();
+        if (!this.debugRun) {
+          save.data.coins += event.amount;
+          save.write();
+        }
         this.audio.coin();
         this.ui.updateHUD(this.score, false, true);
         if (event.amount > 1) this.ui.showToast(`+${event.amount} монеты!`);
       } else if (event.type === "score") {
         this.score = event.score;
         this.ui.updateHUD(this.score, true);
-        if (this.score > save.data.best) {
+        if (!this.debugRun && this.score > save.data.best) {
           save.data.best = this.score;
           save.write();
           if (!this.newBestShown && this.score > this.startingBest) {
@@ -362,6 +386,8 @@ export class Game {
         }
       } else if (event.type === "horn") {
         this.audio.trainHorn(event.volume);
+      } else if (event.type === "geyser") {
+        this.audio.geyser(event.volume);
       } else if (event.type === "eagle-warning") {
         this.ui.showEagleWarning(event.seconds);
         if (event.seconds > 0) this.audio.warning();
@@ -389,14 +415,19 @@ export class Game {
     } else if (event.cause === "eagle") {
       this.audio.crash();
       this.audio.deathTone();
+    } else if (event.cause === "geyser") {
+      this.audio.crash();
+      this.audio.deathTone();
     } else {
       this.audio.crash();
     }
 
-    if (this.score > save.data.best) {
+    if (!this.debugRun && this.score > save.data.best) {
       save.data.best = this.score;
     }
-    save.data.runs += 1;
+    if (!this.debugRun) {
+      save.data.runs += 1;
+    }
     save.write();
   }
 
