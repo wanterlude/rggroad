@@ -51,6 +51,6 @@ export const ART_HEAD_CROPS: Record<SkinId, ArtHeadCrop> = {
   amelia: { x: 0.2, y: 0.02, w: 0.58 },
   nyamuras: { x: 0.18, y: 0.02, w: 0.62 },
   knjazevdesu: { x: 0.18, y: 0.02, w: 0.62 },
-  lilanei: { x: 0, y: 0, w: 1 },
+  lilanei: { x: 0.19, y: 0.03, w: 0.62 },
 };
 
