@@ -119,7 +119,13 @@ export class Game {
     this.ui.updateHUD(0);
     this.ui.updateStats();
     this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted);
+    this.announceBiome();
     this.ui.clearFocus();
+  }
+
+  private announceBiome(): void {
+    const biome = this.world.getBiome();
+    this.ui.showBiomeBanner(biome.name, biome.description ?? "");
   }
 
   private goMenu(): void {
@@ -506,6 +512,7 @@ export class Game {
       if (biomeId !== this.lastBiomeId) {
         this.lastBiomeId = biomeId;
         this.ui.fadeBiomeTransition();
+        this.announceBiome();
       }
     }
 

@@ -2409,6 +2409,71 @@ body.menu-active #game {
   }
 }
 
+/* Biome announcement */
+.biome-banner {
+  position: fixed;
+  left: 50%;
+  top: calc(64px + var(--safe-top));
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: min(92vw, 720px);
+  padding: 9px 24px 12px;
+  transform: translate(-50%, -10px) scale(0.98);
+  border: 2px solid rgba(255, 247, 226, 0.24);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(12, 40, 42, 0.84), rgba(12, 40, 42, 0.58));
+  box-shadow: 0 12px 30px rgba(5, 22, 22, 0.38);
+  opacity: 0;
+  text-align: center;
+  pointer-events: none;
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+
+.biome-banner.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.biome-banner-kicker {
+  color: rgba(255, 247, 226, 0.55);
+  font-family: var(--ui-font);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+}
+
+.biome-banner-title {
+  color: #fff7e2;
+  font-family: var(--ui-font);
+  font-size: clamp(26px, 5vw, 46px);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 rgba(20, 50, 50, 0.55), 0 0 18px rgba(255, 210, 63, 0.16);
+}
+
+.biome-banner-text {
+  max-width: 56ch;
+  color: rgba(255, 247, 226, 0.84);
+  font-family: var(--body-font);
+  font-size: clamp(11px, 1.5vw, 14px);
+  font-weight: 600;
+  line-height: 1.35;
+  text-shadow: 0 1px 2px rgba(10, 30, 30, 0.45);
+}
+
+@media (max-width: 520px) {
+  .biome-banner {
+    top: calc(56px + var(--safe-top));
+    padding: 8px 14px 10px;
+    border-radius: 14px;
+  }
+}
+
 /* Eagle idle warning */
 .eagle-warning {
   position: fixed;

@@ -72,6 +72,7 @@ export interface BiomeWeight<T extends string> {
 export interface BiomeDef {
   id: BiomeId;
   name: string;
+  description?: string;
   accent: number;
   grass: [number, number, number];
   grassLight: number;
@@ -142,7 +143,7 @@ export const BIOME_ORDER: BiomeId[] = [
 const BASE_BIOMES: Record<BaseBiomeId, BiomeDef> = {
   autumn: {
     id: "autumn",
-    name: "Р—Р•Р›РЃРќР«Р• Р›РЈР“Рђ",
+    name: "ОСЕНЬ",
     accent: 0xffd23f,
     grass: [0x9bcc45, 0x8dbd39, 0xabd94e],
     grassLight: 0xbfe66a,
@@ -200,7 +201,7 @@ const BASE_BIOMES: Record<BaseBiomeId, BiomeDef> = {
   },
   forest: {
     id: "forest",
-    name: "Р—Р•Р›РЃРќР«Р™ Р›Р•РЎ",
+    name: "ЛЕС",
     accent: 0x8ad35f,
     grass: [0x6db34d, 0x5da344, 0x85c45d],
     grassLight: 0xa0d578,
@@ -260,7 +261,7 @@ const BASE_BIOMES: Record<BaseBiomeId, BiomeDef> = {
   },
   desert: {
     id: "desert",
-    name: "РџР•РЎРљР РџРЈРЎРўР«РќР",
+    name: "ПУСТЫНЯ",
     accent: 0xffcf63,
     grass: [0xe1bd70, 0xd5ad5d, 0xecd08a],
     grassLight: 0xf4dfa2,
@@ -321,7 +322,7 @@ const BASE_BIOMES: Record<BaseBiomeId, BiomeDef> = {
   },
   ocean: {
     id: "ocean",
-    name: "РўР РћРџРР§Р•РЎРљРР™ РћРљР•РђРќ",
+    name: "ОКЕАН",
     accent: 0x5fe3e8,
     grass: [0xe4d08a, 0xd5c17a, 0xf0e1a5],
     grassLight: 0xf8efc7,
@@ -381,7 +382,7 @@ const BASE_BIOMES: Record<BaseBiomeId, BiomeDef> = {
   },
   frost: {
     id: "frost",
-    name: "Р›Р•Р”РЇРќР«Р• РџРЈРЎРўРћРЁР",
+    name: "ЛЁД",
     accent: 0xc6ecff,
     grass: [0xd4e8f2, 0xc2dbe8, 0xe6f4fa],
     grassLight: 0xf8fdff,
@@ -441,7 +442,7 @@ const BASE_BIOMES: Record<BaseBiomeId, BiomeDef> = {
   },
   lava: {
     id: "lava",
-    name: "РџР•РљР›Рћ",
+    name: "ЛАВА",
     accent: 0xff6a3a,
     grass: [0x3b2737, 0x32202f, 0x4b3040],
     grassLight: 0x603b48,
@@ -502,7 +503,7 @@ const BASE_BIOMES: Record<BaseBiomeId, BiomeDef> = {
   },
   void: {
     id: "void",
-    name: "РџРЈРЎРўРћРўРђ",
+    name: "ПУСТОТА",
     accent: 0xc66bff,
     grass: [0x30203f, 0x271934, 0x3e2a52],
     grassLight: 0x563b70,
@@ -595,7 +596,7 @@ function variant(
 }
 
 const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
-  savanna: variant("savanna", "РЎРђР’РђРќРќРђ", "autumn", {
+  savanna: variant("savanna", "САВАННА", "autumn", {
     grass: [0xc8ae4e, 0xbda346, 0xd6bc61],
     grassLight: 0xe1cb72,
     grassDark: 0x938032,
@@ -630,7 +631,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
     ],
     mechanics: { speed: 1.12, road: 0.46, river: 0.2, rail: 0.14, water: "crocodile", police: false, idle: "vulture", stampede: false }
   }),
-  jungle: variant("jungle", "Р”Р–РЈРќР“Р›Р", "forest", {
+  jungle: variant("jungle", "ДЖУНГЛИ", "forest", {
     grass: [0x4f8f3e, 0x458237, 0x5d9f48],
     grassLight: 0x75b358,
     grassDark: 0x34722b,
@@ -664,7 +665,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
     ],
     mechanics: { speed: 1.06, road: 0.32, river: 0.42, rail: 0.11, water: "lily", police: false, idle: "eagle", stampede: false }
   }),
-  city: variant("city", "Р“РћР РћР”", "autumn", {
+  city: variant("city", "ГОРОД", "autumn", {
     grass: [0x6f8a5c, 0x667f54, 0x7c9668],
     grassLight: 0x91a97e,
     grassDark: 0x536b48,
@@ -700,7 +701,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
     ],
     mechanics: { speed: 1.4, road: 0.56, river: 0.13, rail: 0.1, water: "logs", police: true, idle: "eagle", stampede: false }
   }),
-  space: variant("space", "РљРћРЎРњРћРЎ", "void", {
+  space: variant("space", "КОСМОС", "void", {
     grass: [0x3b334f, 0x352d48, 0x453b5b],
     grassLight: 0x5b4d75,
     grassDark: 0x241e31,
@@ -740,7 +741,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
     ],
     mechanics: { speed: 1.26, road: 0.44, river: 0.2, rail: 0.14, water: "ice", police: false, idle: "ufo", stampede: false }
   }),
-  candy: variant("candy", "РЎР›РђР”РћРЎРўР", "autumn", {
+  candy: variant("candy", "СЛАДОСТИ", "autumn", {
     grass: [0xf0a9c2, 0xe89ab6, 0xf7bbd0],
     grassLight: 0xffd4e2,
     grassDark: 0xd37d9f,
@@ -777,7 +778,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
     ],
     mechanics: { speed: 0.98, road: 0.36, river: 0.32, rail: 0.1, water: "chocolate", police: false, idle: "candy-plane", stampede: false }
   }),
-  prehistoric: variant("prehistoric", "Р”РћРРЎРўРћР РРЇ", "forest", {
+  prehistoric: variant("prehistoric", "ДОИСТОРИЯ", "forest", {
     grass: [0x78a04a, 0x6f9443, 0x83ac53],
     grassLight: 0xa6c36b,
     grassDark: 0x587c38,
@@ -809,7 +810,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
     ],
     mechanics: { speed: 1.18, road: 0.4, river: 0.3, rail: 0.11, water: "crocodile", police: false, idle: "pterodactyl", stampede: true }
   }),
-  halloween: variant("halloween", "РҐР­Р›Р›РћРЈРРќ", "forest", {
+  halloween: variant("halloween", "ХЭЛЛОУИН", "forest", {
     grass: [0x58495a, 0x4f4252, 0x625164],
     grassLight: 0x78667b,
     grassDark: 0x3d3340,
@@ -864,6 +865,27 @@ export function biomeIndexForZ(z: number): number {
 
 export function biomeForZ(z: number): BiomeDef {
   return BIOMES[BIOME_ORDER[biomeIndexForZ(z)]];
+}
+
+export const BIOME_DESCRIPTIONS: Record<BiomeId, string> = {
+  autumn: "Спокойный старт: знакомый трафик, брёвна и орёл. Разомнись — дальше будет разнообразнее.",
+  forest: "Брёвна, густой лес и орёл. Дороги реже, но расслабляться нельзя.",
+  desert: "Больше дорог, крокодилы в воде и жара. Держи темп.",
+  ocean: "Много рек: прыгай по брёвнам и не дай унести себя.",
+  frost: "Ледяные реки и льдины вместо брёвен. Прыгай точнее.",
+  lava: "Самый быстрый трафик в игре. Ошибок не прощает.",
+  void: "Финал цикла: НЛО вместо орла и ледяные реки.",
+  savanna: "Стервятник кружит сверху, в воде крокодилы. Не останавливайся.",
+  jungle: "Много воды и лилий — прыгай по островкам.",
+  city: "Плотный поток и полицейские машины. Смотри на оба ряда.",
+  space: "НЛО и ледяные глыбы вместо рек. Держи ритм.",
+  candy: "Шоколадные реки и конфетный самолёт. Сладко и опасно.",
+  prehistoric: "Стампида вместо поездов и птеродактиль. Слушай гул земли.",
+  halloween: "Летучая мышь и туман. Не оглядывайся.",
+};
+
+for (const biome of Object.values(BIOMES)) {
+  if (!biome.description) biome.description = BIOME_DESCRIPTIONS[biome.id];
 }
 
 export function biomeStartRow(biome: BiomeId): number {

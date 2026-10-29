@@ -35,6 +35,9 @@ export class UI {
     eagleWarning: $("eagleWarning"),
     eagleCountdown: $("eagleCountdown"),
     biomeFade: $("biomeFade"),
+    biomeBanner: $("biomeBanner"),
+    biomeBannerTitle: $("biomeBannerTitle"),
+    biomeBannerText: $("biomeBannerText"),
     menuBest: $("menuBest"),
     menuCoins: $("menuCoins"),
     skinRail: $("skinRail"),
@@ -73,6 +76,7 @@ export class UI {
 
   private toastTimer = 0;
   private newBestTimer = 0;
+  private biomeBannerTimer = 0;
   private wheelAccum = 0;
   private wheelIdleTimer = 0;
   private wheelIndex = -1;
@@ -210,6 +214,7 @@ export class UI {
     this.setHidden(this.refs.newBestBadge, true);
     this.setHidden(this.refs.newBestRibbon, true);
     this.hideTutorial();
+    this.hideBiomeBanner();
     this.updateStats();
     this.renderSkinCards();
   }
@@ -234,6 +239,21 @@ export class UI {
     fade.classList.add("is-active");
   }
 
+  /** Big top-centre announcement with the biome name and its special rule. */
+  showBiomeBanner(title: string, text: string): void {
+    const { biomeBanner, biomeBannerTitle, biomeBannerText } = this.refs;
+    biomeBannerTitle.textContent = title;
+    biomeBannerText.textContent = text;
+    biomeBanner.classList.add("is-visible");
+    window.clearTimeout(this.biomeBannerTimer);
+    this.biomeBannerTimer = window.setTimeout(() => this.hideBiomeBanner(), 4500);
+  }
+
+  hideBiomeBanner(): void {
+    window.clearTimeout(this.biomeBannerTimer);
+    this.refs.biomeBanner.classList.remove("is-visible");
+  }
+
   showPlaying(): void {
     this.setHidden(this.refs.menu, true);
     this.setHidden(this.refs.hud, false);
@@ -248,6 +268,7 @@ export class UI {
   showPause(): void {
     this.setHidden(this.refs.pause, false);
     this.hideEagleWarning();
+    this.hideBiomeBanner();
     this.hideTutorial();
   }
 
@@ -291,6 +312,7 @@ export class UI {
     this.setHidden(this.refs.newBestRibbon, !options.isRecord);
     this.setHidden(this.refs.gameover, false);
     this.setHidden(this.refs.hud, true);
+    this.hideBiomeBanner();
     window.setTimeout(() => {
       if (this.refs.retryBtn) this.refs.retryBtn.focus({ preventScroll: true });
     }, 60);
