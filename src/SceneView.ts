@@ -1,9 +1,24 @@
 import * as THREE from "three";
 import { animateWater } from "./RowModels";
 import type { BiomeDef } from "./biomes";
+import type { SeasonId } from "./season";
 import { Particles } from "./Particles";
 import { createBlobShadow, createVoxelMesh } from "./Voxel";
 import type { CubeSpec } from "./types";
+
+interface AmbientParticle {
+  active: boolean;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  rot: number;
+  spin: number;
+  size: number;
+  color: number;
+}
 
 const skyVertex = `
 varying vec3 vLocalPosition;
@@ -64,8 +79,14 @@ export class SceneView {
   private readonly hemisphere: THREE.HemisphereLight;
   private readonly target = new THREE.Object3D();
   private isoHeight = 10.5;
+  private season: SeasonId = "none";
+  private readonly ambientMesh: THREE.InstancedMesh;
+  private readonly ambient: AmbientParticle[] = [];
+  private ambientLastTime = 0;
+  private readonly ambientDummy = new THREE.Object3D();
+  private readonly ambientColor = new THREE.Color();
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, season: SeasonId = "none") {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -156,6 +177,39 @@ export class SceneView {
     this.scene.add(this.playerShadow);
 
     this.particles = new Particles(this.scene);
+
+    // Seasonal event particles live in their own fixed pool so they never
+    // starve gameplay effects (dust, coins, feathers) of particle slots.
+    this.ambientMesh = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.09, 0.09, 0.09),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false
+      }),
+      90
+    );
+    this.ambientMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.ambientMesh.frustumCulled = false;
+    this.ambientMesh.renderOrder = 4;
+    this.scene.add(this.ambientMesh);
+    for (let i = 0; i < 90; i++) {
+      this.ambient.push({
+        active: false,
+        x: 0,
+        y: -100,
+        z: 0,
+        vx: 0,
+        vy: 0,
+        vz: 0,
+        rot: 0,
+        spin: 0,
+        size: 0.06,
+        color: 0xffffff
+      });
+    }
+    this.setSeason(season);
 
     this.menuStage = this.buildMenuStage();
     this.scene.add(this.menuStage);
@@ -382,6 +436,82 @@ export class SceneView {
     this.clouds.rotation.y = Math.sin(time * 0.012) * 0.015;
 
     animateWater(time);
+    this.updateSeason(time, anchor);
+  }
+
+  setSeason(season: SeasonId): void {
+    this.season = season;
+    this.ambientMesh.visible = season !== "none";
+    for (const particle of this.ambient) particle.active = false;
+    this.ambientLastTime = 0;
+    this.syncAmbient();
+  }
+
+  private updateSeason(time: number, anchor: THREE.Vector3): void {
+    if (this.season === "none") return;
+    if (this.ambientLastTime === 0) this.ambientLastTime = time;
+    const dt = Math.min(0.05, Math.max(0, time - this.ambientLastTime));
+    this.ambientLastTime = time;
+    const rate = this.season === "newyear" ? 9 : 11;
+    if (Math.random() < dt * rate) this.spawnSeasonParticle(anchor);
+
+    for (const particle of this.ambient) {
+      if (!particle.active) continue;
+      particle.x += particle.vx * dt;
+      particle.y += particle.vy * dt;
+      particle.z += particle.vz * dt;
+      particle.rot += particle.spin * dt;
+      if (particle.y < -0.3) particle.active = false;
+    }
+    this.syncAmbient();
+  }
+
+  private spawnSeasonParticle(anchor: THREE.Vector3): void {
+    const particle = this.ambient.find((item) => !item.active);
+    if (!particle) return;
+    particle.active = true;
+    particle.x = anchor.x + (Math.random() - 0.5) * 24;
+    particle.z = anchor.z - 4 + Math.random() * 26;
+    particle.y = 4 + Math.random() * 7;
+    particle.rot = Math.random() * Math.PI * 2;
+    if (this.season === "newyear") {
+      particle.vx = (Math.random() - 0.5) * 0.25;
+      particle.vy = -(0.55 + Math.random() * 0.45);
+      particle.vz = (Math.random() - 0.5) * 0.2;
+      particle.spin = 0.8 + Math.random() * 1.2;
+      particle.size = 0.04 + Math.random() * 0.035;
+      particle.color = [0xffffff, 0xd8f0ff, 0xa8d8ff][Math.floor(Math.random() * 3)];
+    } else {
+      particle.vx = 0.25 + Math.random() * 0.55;
+      particle.vy = -(0.65 + Math.random() * 0.5);
+      particle.vz = (Math.random() - 0.5) * 0.25;
+      particle.spin = 2.5 + Math.random() * 3;
+      particle.size = 0.05 + Math.random() * 0.045;
+      particle.color = [0xff8a3d, 0xffb347, 0xc66bff, 0xe05a3a][Math.floor(Math.random() * 4)];
+    }
+  }
+
+  private syncAmbient(): void {
+    for (let i = 0; i < this.ambient.length; i++) {
+      const particle = this.ambient[i];
+      if (!particle.active) {
+        this.ambientDummy.position.set(0, -100, 0);
+        this.ambientDummy.scale.set(0.0001, 0.0001, 0.0001);
+        this.ambientDummy.rotation.set(0, 0, 0);
+      } else {
+        this.ambientDummy.position.set(particle.x, particle.y, particle.z);
+        this.ambientDummy.rotation.set(particle.rot, particle.rot * 0.7, particle.rot * 0.3);
+        this.ambientDummy.scale.setScalar(particle.size);
+      }
+      this.ambientDummy.updateMatrix();
+      this.ambientMesh.setMatrixAt(i, this.ambientDummy.matrix);
+      if (particle.active) {
+        this.ambientColor.setHex(particle.color);
+        this.ambientMesh.setColorAt(i, this.ambientColor);
+      }
+    }
+    this.ambientMesh.instanceMatrix.needsUpdate = true;
+    if (this.ambientMesh.instanceColor) this.ambientMesh.instanceColor.needsUpdate = true;
   }
 
   render(camera: THREE.Camera = this.camera): void {

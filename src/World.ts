@@ -46,6 +46,7 @@ import type {
   Row,
   RowType,
   SignData,
+  SinkholeData,
   TarPitData,
   TrainData
 } from "./types";
@@ -110,6 +111,13 @@ const TIDE_LIFE = 7;
 const LIGHT_GREEN_SECONDS = 4.4;
 const LIGHT_AMBER_SECONDS = 0.8;
 const LIGHT_CYCLE = LIGHT_GREEN_SECONDS + LIGHT_AMBER_SECONDS + 2.8;
+// Swamp quicksand: the mud starts bubbling, then pulls the hero under.
+const SINK_WARN_SECONDS = 1.25;
+// Ashlands wind: dust telegraph, then a one-cell sideways shove.
+const WIND_WARN_SECONDS = 1.15;
+const WIND_FIRST_DELAY = 3.2;
+const WIND_GAP_MIN = 5.5;
+const WIND_GAP_MAX = 8;
 const geyserRingGeometry = new THREE.RingGeometry(0.24, 0.44, 24);
 const geyserVentGeometry = new THREE.CircleGeometry(0.24, 20);
 const fragileTileGeometry = new THREE.BoxGeometry(0.94, 0.06, 0.94);
@@ -128,6 +136,8 @@ const fallerShadowMaterial = new THREE.MeshBasicMaterial({
 const tarPitGeometry = new THREE.CircleGeometry(0.44, 20);
 const tarRingGeometry = new THREE.RingGeometry(0.44, 0.52, 20);
 const tarBubbleGeometry = new THREE.SphereGeometry(0.06, 6, 4);
+const sinkMudGeometry = new THREE.CircleGeometry(0.48, 22);
+const sinkRingGeometry = new THREE.RingGeometry(0.4, 0.52, 22);
 const leafCubeGeometry = new THREE.BoxGeometry(0.15, 0.06, 0.13);
 const leafMaterials = new Map<number, THREE.MeshLambertMaterial>();
 const beltBaseTexture = (() => {
@@ -212,6 +222,9 @@ export class World {
   private tideTimer = TIDE_FIRST_DELAY;
   private tideAge = 0;
   private tideZ = 0;
+  private windTimer = WIND_FIRST_DELAY;
+  private windWarn = 0;
+  private windDir: 1 | -1 = 1;
   private frontier = 4;
   private back = -38;
   private time = 0;
@@ -289,7 +302,7 @@ export class World {
 
     // Debug launches (?row=) jump straight to a biome: generate up to the
     // requested position, then spawn on the nearest safe grass row.
-    const wanted = this.debugStart > 0 ? Math.min(Math.floor(this.debugStart), 480) : 0;
+    const wanted = this.debugStart > 0 ? Math.min(Math.floor(this.debugStart), 600) : 0;
     if (wanted > 2) this.generateAhead(wanted + GEN_AHEAD);
     if (wanted > 0) {
       let spawnZ = wanted;
@@ -312,7 +325,8 @@ export class World {
           const geyser = (spawnRow.geysers ?? []).some((g) => Math.abs(g.x - x) < 0.8);
           const fragile = (spawnRow.fragile ?? []).some((tile) => Math.abs(tile.x - x) < 0.8);
           const faller = (spawnRow.fallers ?? []).some((drop) => Math.abs(drop.x - x) < 0.8);
-          if (!blocked && !geyser && !fragile && !faller) {
+          const sink = (spawnRow.sinkholes ?? []).some((hole) => Math.abs(hole.x - x) < 0.8);
+          if (!blocked && !geyser && !fragile && !faller && !sink) {
             spawnX = x;
             break;
           }
@@ -345,7 +359,7 @@ export class World {
     return this.debugStart > 0 || this.forceBiomeId !== null;
   }
 
-  /** Elite cycles are after the first full pass through the 14 biomes. */
+  /** Elite cycles are after the first full pass through the 16 biomes. */
   getElite(): boolean {
     if (this.mode !== "run") return false;
     return biomeSegmentAt(Math.max(0, this.player.z)).cycle > 0;
@@ -507,6 +521,7 @@ export class World {
     for (const faller of row.fallers ?? []) this.buildFaller(faller, row);
     for (const pile of row.leafPiles ?? []) this.buildLeafPile(pile, row);
     for (const pit of row.tarPits ?? []) this.buildTarPit(pit, row);
+    for (const hole of row.sinkholes ?? []) this.buildSinkhole(hole, row);
     for (const belt of row.belts ?? []) this.buildBelt(belt, row);
 
     if (row.light) this.buildTrafficLight(row);
@@ -733,6 +748,9 @@ export class World {
     if (mechanics.tarPits && this.mode !== "menu" && this.rng() < 0.6) {
       this.addTarPit(row);
     }
+    if (mechanics.sink && options.allowProps && this.mode !== "menu" && this.rng() < 0.58) {
+      this.addSinkholes(row);
+    }
     if (belt) this.addBelt(row);
     if (options.allowCoin) this.addCoin(row, 0.5, -3.8, 3.8);
     return row;
@@ -767,6 +785,54 @@ export class World {
       pits.push({ x });
     }
     if (pits.length > 0) row.tarPits = pits;
+  }
+
+  private addSinkholes(row: Row): void {
+    const count = this.rng() < 0.7 ? 1 : 2;
+    const lanes = [-3, -2, -1, 0, 1, 2, 3];
+    this.shuffleLane(lanes);
+    const holes: SinkholeData[] = [];
+    for (const x of lanes) {
+      if (holes.length >= count) break;
+      if (row.props.some((prop) => prop.collider && Math.abs(prop.x - x) < prop.radius + 0.55)) continue;
+      if ((row.geysers ?? []).some((geyser) => Math.abs(geyser.x - x) < 0.8)) continue;
+      if ((row.fallers ?? []).some((faller) => Math.abs(faller.x - x) < 0.8)) continue;
+      if ((row.fragile ?? []).some((tile) => Math.abs(tile.x - x) < 0.8)) continue;
+      if ((row.leafPiles ?? []).some((pile) => Math.abs(pile.x - x) < 0.8)) continue;
+      if ((row.tarPits ?? []).some((pit) => Math.abs(pit.x - x) < 0.8)) continue;
+      holes.push({ x, state: "idle", timer: 0 });
+    }
+    if (holes.length > 0) row.sinkholes = holes;
+  }
+
+  private buildSinkhole(sink: SinkholeData, row: Row): void {
+    const biome = BIOMES[row.biome];
+    const mud = new THREE.Mesh(
+      sinkMudGeometry,
+      new THREE.MeshLambertMaterial({ color: 0x2c2318, flatShading: true })
+    );
+    mud.rotation.x = -Math.PI / 2;
+    mud.position.set(sink.x, 0.04, 0);
+    mud.renderOrder = 2;
+    row.group.add(mud);
+    sink.mesh = mud;
+
+    const ring = new THREE.Mesh(
+      sinkRingGeometry,
+      new THREE.MeshBasicMaterial({
+        color: biome.accent,
+        transparent: true,
+        opacity: 0.3,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(sink.x, 0.055, 0);
+    ring.visible = false;
+    ring.renderOrder = 3;
+    row.group.add(ring);
+    sink.ring = ring;
   }
 
   private addBelt(row: Row): void {
@@ -1004,6 +1070,7 @@ export class World {
       if (row.fallers?.some((faller) => Math.abs(faller.x - x) < 0.75)) continue;
       if (row.leafPiles?.some((pile) => Math.abs(pile.x - x) < 0.75)) continue;
       if (row.tarPits?.some((pit) => Math.abs(pit.x - x) < 0.75)) continue;
+      if (row.sinkholes?.some((hole) => Math.abs(hole.x - x) < 0.75)) continue;
       row.coin = {
         x,
         z: row.z,
@@ -1189,6 +1256,8 @@ export class World {
     this.updateFragile(dt, time);
     this.updateFallers(dt, time);
     this.updateTide(dt);
+    this.updateSinkholes(dt);
+    this.updateWind(dt);
     this.updateIdleHazard(dt);
     this.updateCoins(time);
     this.updateLeafPiles();
@@ -1700,6 +1769,146 @@ export class World {
     this.tideGroup.visible = false;
   }
 
+  private updateSinkholes(dt: number): void {
+    if (this.mode === "menu") return;
+    const p = this.player;
+    if (p.dead) return;
+    const nearMin = p.z - 4;
+    const nearMax = p.z + 9;
+
+    for (const row of this.rows.values()) {
+      if (!row.sinkholes || row.z < nearMin || row.z > nearMax) continue;
+      for (const hole of row.sinkholes) {
+        const on =
+          !p.hopping &&
+          Math.abs(p.z - row.z) < 0.55 &&
+          Math.abs(p.x - hole.x) < 0.5 &&
+          p.y < 1.1;
+
+        if (!on) {
+          if (hole.state === "warning") {
+            hole.state = "idle";
+            hole.timer = 0;
+            if (hole.ring) hole.ring.visible = false;
+            if (hole.mesh) hole.mesh.scale.set(1, 1, 1);
+          }
+          continue;
+        }
+
+        if (hole.state === "idle") {
+          hole.state = "warning";
+          hole.timer = 0;
+          if (hole.ring) hole.ring.visible = true;
+          this.events.push({ type: "sink", seconds: 1 });
+          this.shake = Math.max(this.shake, 0.1);
+        }
+
+        hole.timer += dt;
+        const k = clamp(hole.timer / SINK_WARN_SECONDS, 0, 1);
+        if (hole.ring) {
+          hole.ring.scale.setScalar(1 + k * 0.55);
+          const material = hole.ring.material as THREE.MeshBasicMaterial;
+          material.opacity = 0.3 + k * 0.6;
+        }
+        if (hole.mesh) hole.mesh.scale.set(1 + k * 0.16, 1, 1 + k * 0.16);
+
+        if (Math.random() < dt * 18) {
+          this.sceneView.particles.spawn({
+            x: hole.x + (Math.random() - 0.5) * 0.5,
+            y: 0.05,
+            z: row.z + (Math.random() - 0.5) * 0.5,
+            vy: 0.45 + Math.random() * 0.4,
+            gravity: 1.1,
+            life: 0.35 + Math.random() * 0.3,
+            size: 0.04 + Math.random() * 0.05,
+            color: 0x9fe86a
+          });
+        }
+
+        if (hole.timer >= SINK_WARN_SECONDS) {
+          this.die("sink");
+          return;
+        }
+      }
+    }
+  }
+
+  private updateWind(dt: number): void {
+    if (this.mode !== "run" || this.player.dead) return;
+    const p = this.player;
+    if (this.mechanicsAt(p.z).wind !== true) {
+      this.windWarn = 0;
+      this.windTimer = WIND_FIRST_DELAY;
+      return;
+    }
+
+    if (this.windWarn > 0) {
+      this.windWarn -= dt;
+      this.spawnWindDust(dt);
+      if (this.windWarn <= 0) {
+        this.windWarn = 0;
+        if (!p.hopping && !p.dead) {
+          const row = this.rows.get(Math.round(p.z));
+          if (row?.type === "grass") {
+            const first = this.windDir;
+            if (!this.tryMove(first, 0)) this.tryMove((first === 1 ? -1 : 1), 0);
+          }
+        }
+        this.windTimer = rr(this.rng, WIND_GAP_MIN, WIND_GAP_MAX);
+      }
+      return;
+    }
+
+    this.windTimer -= dt;
+    if (this.windTimer > 0) return;
+    if (p.hopping || p.dead) {
+      this.windTimer = 0.5;
+      return;
+    }
+    const row = this.rows.get(Math.round(p.z));
+    if (!row || row.type !== "grass") {
+      this.windTimer = 0.6;
+      return;
+    }
+    const left = this.windCellOpen(p.x - 1, row);
+    const right = this.windCellOpen(p.x + 1, row);
+    if (!left && !right) {
+      this.windTimer = 2;
+      return;
+    }
+    this.windDir = left && right ? (this.rng() < 0.5 ? -1 : 1) : left ? -1 : 1;
+    this.windWarn = WIND_WARN_SECONDS;
+    this.events.push({ type: "wind", seconds: 1 });
+    this.shake = Math.max(this.shake, 0.06);
+  }
+
+  private windCellOpen(x: number, row: Row): boolean {
+    if (Math.abs(x) > 4) return false;
+    if (row.props.some((prop) => prop.collider && Math.abs(prop.x - x) < prop.radius + 0.28)) return false;
+    if ((row.sinkholes ?? []).some((hole) => Math.abs(hole.x - x) < 0.5)) return false;
+    if ((row.fragile ?? []).some((tile) => tile.state !== "idle" && Math.abs(tile.x - x) < 0.55)) return false;
+    if ((row.geysers ?? []).some((geyser) => Math.abs(geyser.x - x) < 0.6)) return false;
+    return true;
+  }
+
+  private spawnWindDust(dt: number): void {
+    if (Math.random() > dt * 30) return;
+    const p = this.player;
+    const dir = this.windDir;
+    this.sceneView.particles.spawn({
+      x: p.x - dir * 2.6 + (Math.random() - 0.5) * 1.6,
+      y: 0.12 + Math.random() * 0.8,
+      z: p.z + (Math.random() - 0.5) * 0.9,
+      vx: dir * (2.6 + Math.random() * 1.8),
+      vy: 0.05 + Math.random() * 0.2,
+      vz: (Math.random() - 0.5) * 0.35,
+      gravity: 0,
+      life: 0.3 + Math.random() * 0.25,
+      size: 0.04 + Math.random() * 0.06,
+      color: 0xd8b090
+    });
+  }
+
   private updateFragile(dt: number, time: number): void {    if (this.mode === "menu") return;
     const p = this.player;
     if (p.dead) return;
@@ -1998,11 +2207,12 @@ export class World {
 
   private updateDeath(dt: number): void {
     const p = this.player;
-    if (p.deathCause === "water") {
-      p.y = -this.deathTime * 0.8;
+    if (p.deathCause === "water" || p.deathCause === "sink") {
+      const sinking = p.deathCause === "sink";
+      p.y = -this.deathTime * (sinking ? 0.55 : 0.8);
       p.surfaceY = -0.02;
       this.deathBubbleTimer -= dt;
-      if (this.deathBubbleTimer <= 0 && this.deathTime < 0.9) {
+      if (this.deathBubbleTimer <= 0 && this.deathTime < (sinking ? 0.8 : 0.9)) {
         this.deathBubbleTimer = 0.09;
         this.sceneView.particles.spawn({
           x: p.x + (this.rng() - 0.5) * 0.5,
@@ -2012,10 +2222,10 @@ export class World {
           gravity: -0.4,
           life: 0.5,
           size: 0.05,
-          color: 0xd8f8ff
+          color: sinking ? 0x8a7a3a : 0xd8f8ff
         });
       }
-      if (p.y < -0.9) this.playerGroup.visible = false;
+      if (p.y < (sinking ? -0.75 : -0.9)) this.playerGroup.visible = false;
     } else {
       p.y = Math.max(0, p.y - dt * 1.4);
       p.squash = clamp(1 - this.deathTime * 3.4, 0.16, 1);
@@ -2031,19 +2241,23 @@ export class World {
       : !p.hopping && !p.dead
         ? Math.sin(time * 2.8 + p.idlePhase) * 0.012
         : 0;
-    const surface = p.deathCause === "water" && p.dead ? -0.02 : p.surfaceY;
+    const surface = (p.deathCause === "water" || p.deathCause === "sink") && p.dead ? -0.02 : p.surfaceY;
     this.playerGroup.position.set(p.x, surface + p.y + bob, p.z);
     this.playerGroup.rotation.y = p.faceYaw;
-    const squash = p.dead && p.deathCause !== "water" ? p.squash : 1;
+    const squash = p.dead && p.deathCause !== "water" && p.deathCause !== "sink" ? p.squash : 1;
     const menuScale = this.mode === "menu" ? 1.14 : 1;
     this.playerGroup.scale.set(
       menuScale * (1 + (1 - squash) * 0.3),
       menuScale * squash,
       menuScale * (1 + (1 - squash) * 0.3)
     );
-    this.playerGroup.visible = !(p.dead && p.deathCause === "water" && this.deathTime > 1.2);
+    this.playerGroup.visible = !(
+      p.dead &&
+      (p.deathCause === "water" || p.deathCause === "sink") &&
+      this.deathTime > (p.deathCause === "sink" ? 1 : 1.2)
+    );
 
-    const hideShadow = p.dead && p.deathCause === "water";
+    const hideShadow = p.dead && (p.deathCause === "water" || p.deathCause === "sink");
     this.shadow.visible = !hideShadow && p.y > -0.2;
     if (!hideShadow) {
       this.shadow.position.set(p.x, surface + 0.022, p.z);
@@ -2238,6 +2452,7 @@ export class World {
     if (row.props.some((prop) => prop.collider && Math.abs(prop.x - targetX) < prop.radius + 0.28)) return;
     if ((row.geysers ?? []).some((g) => Math.abs(g.x - targetX) < 0.7)) return;
     if ((row.fragile ?? []).some((tile) => Math.abs(tile.x - targetX) < 0.7)) return;
+    if ((row.sinkholes ?? []).some((hole) => Math.abs(hole.x - targetX) < 0.7)) return;
 
     p.fromX = p.x;
     p.fromZ = p.z;
@@ -2320,6 +2535,15 @@ export class World {
 
     // A log or tumbleweed is about to reach the hero: sidestep it first.
     const here = this.rows.get(Math.round(p.z));
+    const sink = here?.sinkholes?.find((hole) => Math.abs(hole.x - p.x) < 0.5);
+    if (sink) {
+      for (const action of [{ dx: 0, dz: 1 }, { dx: 1, dz: 0 }, { dx: -1, dz: 0 }]) {
+        if (this.tryMove(action.dx, action.dz)) {
+          this.demoMoveTimer = 0.1;
+          return;
+        }
+      }
+    }
     const threat = here?.rollers?.find((roller) => Math.abs(roller.x - p.x) < 2.1);
     if (threat) {
       const away = Math.sign(p.x - threat.x) || 1;
@@ -2494,6 +2718,9 @@ export class World {
     }
     for (const faller of row.fallers ?? []) {
       if (Math.abs(faller.x - x) < 0.7) return false;
+    }
+    for (const sink of row.sinkholes ?? []) {
+      if (Math.abs(sink.x - x) < 0.7) return false;
     }
     return true;
   }

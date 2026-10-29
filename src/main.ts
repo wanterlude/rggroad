@@ -2,6 +2,7 @@ import "../styles.css";
 import { Game } from "./Game";
 import { BIOME_ORDER, INTERMEDIATE_ORDER, type BiomeId } from "./biomes";
 import { save } from "./save";
+import { parseSeason } from "./season";
 import { setMoryakaEyeVariant } from "./Models";
 
 function showFatal(message: string): void {
@@ -50,12 +51,14 @@ try {
   const knownBiomes: string[] = [...BIOME_ORDER, ...INTERMEDIATE_ORDER];
   const biome =
     biomeRaw !== null && knownBiomes.includes(biomeRaw) ? (biomeRaw as BiomeId) : undefined;
+  const season = parseSeason(query.get("season")) ?? undefined;
   const game = new Game(canvas, {
     seed,
     row,
     biome,
     bot: query.get("bot") === "1",
-    autostart: query.get("start") === "1" || query.get("autoplay") === "1"
+    autostart: query.get("start") === "1" || query.get("autoplay") === "1",
+    season
   });
   const debug = query.get("debug") === "1";
   game.setDebug(debug);

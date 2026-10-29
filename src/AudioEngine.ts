@@ -1,9 +1,72 @@
 import { clamp } from "./utils";
 import { save } from "./save";
+import type { BiomeId } from "./biomes";
 
 type Bus = "sfx" | "music";
 
 const midiToFreq = (midi: number): number => 440 * Math.pow(2, (midi - 69) / 12);
+
+/**
+ * One short procedural theme per biome. The melody is written as scale
+ * degrees so every world gets its own colour without shipping audio files:
+ * minor pentatonic for the darker places, major pentatonic for the calm ones,
+ * whole-tone for space and void. All themes share the same 16-step grid so a
+ * biome change lands on a phrase boundary instead of cutting a note.
+ */
+interface MusicTheme {
+  root: number;
+  scale: number[];
+  melody: number[];
+  bass: number[];
+  step: number;
+  wave: OscillatorType;
+  leadVolume: number;
+  bassVolume: number;
+  shaker: boolean;
+}
+
+const MAJOR = [0, 2, 4, 5, 7, 9, 11];
+const MINOR = [0, 2, 3, 5, 7, 8, 10];
+const PENTA = [0, 2, 4, 7, 9];
+const MINOR_PENTA = [0, 3, 5, 7, 10];
+const WHOLE = [0, 2, 4, 6, 8, 10];
+const PHRYGIAN = [0, 1, 3, 5, 7, 8, 10];
+
+const theme = (
+  root: number,
+  scale: number[],
+  melody: number[],
+  bass: number[],
+  step: number,
+  wave: OscillatorType,
+  leadVolume: number,
+  bassVolume: number,
+  shaker = false
+): MusicTheme => ({ root, scale, melody, bass, step, wave, leadVolume, bassVolume, shaker });
+
+const MUSIC_THEMES: Record<BiomeId, MusicTheme> = {
+  autumn: theme(50, PENTA, [0, 2, 4, 2, 5, 4, 2, 0, 4, 5, 7, 5, 4, 2, 0, -1], [0, -5, 3, -2], 0.176, "triangle", 0.036, 0.03, true),
+  forest: theme(48, PENTA, [0, 4, 2, 4, 5, 7, 5, 2, 0, 2, 4, 5, 4, 2, 0, -1], [0, 3, 5, -2], 0.19, "sine", 0.034, 0.032, true),
+  desert: theme(45, PHRYGIAN, [0, 1, 4, 1, 5, 4, 1, 0, 4, 5, 1, 4, 0, 1, -1, -1], [0, 1, -2, 4], 0.185, "sawtooth", 0.024, 0.028, true),
+  ocean: theme(45, MAJOR, [0, 4, 7, 5, 4, 2, 4, 0, 5, 7, 9, 7, 4, 2, 0, -1], [0, 5, 3, -2], 0.205, "sine", 0.033, 0.034, false),
+  frost: theme(52, MINOR_PENTA, [0, 3, 5, 7, 5, 3, 0, -1, 7, 5, 3, 5, 7, 10, 7, -1], [0, -2, 3, -5], 0.2, "sine", 0.03, 0.028, false),
+  lava: theme(38, MINOR, [0, 3, 5, 3, 6, 5, 3, 0, 5, 6, 8, 6, 5, 3, 0, -1], [0, 3, -2, 5], 0.162, "sawtooth", 0.026, 0.034, true),
+  void: theme(45, WHOLE, [0, 2, 4, 2, 6, 4, 2, -1, 4, 6, 8, 6, 4, 2, -1, -1], [0, -3, 2, -5], 0.215, "sine", 0.031, 0.03, false),
+  savanna: theme(43, PENTA, [0, 2, 4, 5, 4, 2, 0, -1, 5, 4, 7, 5, 4, 2, 0, -1], [0, 5, -2, 3], 0.178, "triangle", 0.034, 0.03, true),
+  jungle: theme(45, MINOR_PENTA, [0, 3, 5, 7, 5, 3, 0, 3, 7, 10, 7, 5, 3, 5, 0, -1], [0, 3, 5, -2], 0.158, "triangle", 0.033, 0.031, true),
+  city: theme(48, MINOR, [0, 3, 5, 7, 5, 3, 5, 0, 7, 8, 5, 3, 0, 3, -1, -1], [0, 5, -2, 3], 0.152, "square", 0.021, 0.032, true),
+  space: theme(50, WHOLE, [0, 4, 2, 6, 4, 8, 6, 2, 0, 2, 4, 6, 8, 10, 6, -1], [0, -2, 4, -4], 0.225, "sine", 0.03, 0.026, false),
+  candy: theme(52, MAJOR, [0, 4, 7, 9, 7, 4, 2, 4, 9, 7, 4, 2, 0, 4, 7, -1], [0, 5, 3, -2], 0.15, "triangle", 0.035, 0.028, true),
+  prehistoric: theme(41, MINOR_PENTA, [0, 3, 5, 3, 0, 5, 7, 5, 3, 0, -1, 3, 5, 7, 0, -1], [0, 3, -2, 5], 0.172, "sawtooth", 0.023, 0.033, true),
+  halloween: theme(43, MINOR, [0, 1, 3, 1, 6, 3, 1, 0, 3, 6, 1, 3, 0, -1, -1, -1], [0, 1, -2, 6], 0.19, "triangle", 0.03, 0.03, false),
+  swamp: theme(43, MINOR_PENTA, [0, 3, 5, 3, 0, -1, 5, 7, 5, 3, 0, 3, 5, -1, 0, -1], [0, -2, 3, -5], 0.2, "sine", 0.031, 0.032, false),
+  ashlands: theme(41, PHRYGIAN, [0, 1, 4, 1, 5, 4, 1, 0, 4, 5, 1, 4, 0, -1, -1, -1], [0, 3, -2, 4], 0.17, "sawtooth", 0.023, 0.031, true),
+  storm: theme(45, MINOR, [0, 3, 5, 3, 7, 5, 3, 0, 5, 7, 8, 7, 5, 3, 0, -1], [0, 3, 5, 3], 0.148, "sawtooth", 0.022, 0.03, true),
+  flood: theme(48, MAJOR, [0, 4, 2, 4, 7, 4, 2, 0, 5, 7, 4, 2, 0, 4, -1, -1], [0, 5, -2, 3], 0.2, "sine", 0.031, 0.032, false),
+  crossroads: theme(46, PHRYGIAN, [0, 1, 3, 5, 3, 1, 0, -1, 5, 3, 1, 0, 3, 5, 0, -1], [0, 3, -2, 1], 0.16, "triangle", 0.029, 0.031, true)
+};
+
+const DEFAULT_THEME = MUSIC_THEMES.autumn;
 
 export class AudioEngine {
   private ctx: AudioContext | null = null;
@@ -16,6 +79,8 @@ export class AudioEngine {
   private musicStep = 0;
   private nextNoteTime = 0;
   private ready = false;
+  private musicTheme: MusicTheme = DEFAULT_THEME;
+  private currentBiome: BiomeId = "autumn";
   muted = save.data.muted;
   musicMuted = save.data.musicMuted;
 
@@ -115,6 +180,23 @@ export class AudioEngine {
   setMusicDucked(ducked: boolean): void {
     this.musicDucked = ducked;
     this.applyMusicGain(0.14);
+  }
+
+  /**
+   * Switch the loop to the next biome's theme. Notes already scheduled are
+   * left to decay naturally; the new phrase starts on the next step and the
+   * music bus dips for a fraction of a second so the change does not click.
+   */
+  setBiome(biome: BiomeId): void {
+    if (biome === this.currentBiome) return;
+    this.currentBiome = biome;
+    this.musicTheme = MUSIC_THEMES[biome] ?? DEFAULT_THEME;
+    if (!this.ctx || !this.musicGain || this.musicMuted) return;
+    const now = this.ctx.currentTime;
+    const target = this.musicDucked ? 0.16 : 0.42;
+    this.musicGain.gain.cancelScheduledValues(now);
+    this.musicGain.gain.setTargetAtTime(target * 0.58, now, 0.035);
+    this.musicGain.gain.setTargetAtTime(target, now + 0.5, 0.14);
   }
 
   private canPlay(): boolean {
@@ -232,6 +314,22 @@ export class AudioEngine {
     this.tone({ frequency: 72, endFrequency: 44, duration: 0.8, type: "sine", volume: 0.06 });
   }
 
+  wind(): void {
+    this.noise({ duration: 0.62, volume: 0.06, filterType: "bandpass", frequency: 420, endFrequency: 1500, q: 0.55 });
+    this.tone({ frequency: 180, endFrequency: 240, duration: 0.42, type: "sine", volume: 0.018 });
+  }
+
+  sinkWarn(): void {
+    this.noise({ duration: 0.32, volume: 0.055, filterType: "bandpass", frequency: 280, endFrequency: 90, q: 2.2 });
+    this.tone({ frequency: 130, endFrequency: 70, duration: 0.3, type: "triangle", volume: 0.035 });
+  }
+
+  sink(): void {
+    this.noise({ duration: 0.65, volume: 0.13, filterType: "lowpass", frequency: 420, endFrequency: 70 });
+    this.tone({ frequency: 110, endFrequency: 38, duration: 0.7, type: "sine", volume: 0.07 });
+    this.noise({ duration: 0.3, volume: 0.05, filterType: "bandpass", frequency: 900, endFrequency: 200, q: 1.4, delay: 0.1 });
+  }
+
   splash(): void {
     this.noise({ duration: 0.34, volume: 0.14, filterType: "bandpass", frequency: 1500, endFrequency: 260, q: 0.7 });
     this.tone({ frequency: 420, endFrequency: 120, duration: 0.24, type: "sine", volume: 0.055 });
@@ -299,31 +397,37 @@ export class AudioEngine {
     if (!this.ctx || this.musicMuted || this.ctx.state !== "running") return;
     const now = this.ctx.currentTime;
     if (this.nextNoteTime < now - 0.5) this.nextNoteTime = now + 0.08;
-    while (this.nextNoteTime < now + 0.22) {
+    while (this.nextNoteTime < now + 0.24) {
       this.playMusicStep(this.musicStep, this.nextNoteTime);
-      this.musicStep = (this.musicStep + 1) % 32;
-      this.nextNoteTime += 0.172;
+      this.musicStep = (this.musicStep + 1) % 16;
+      this.nextNoteTime += this.musicTheme.step;
     }
   }
 
+  /** Convert a scale degree into a MIDI note, wrapping octaves as needed. */
+  private scaleNote(degree: number): number {
+    const { scale, root } = this.musicTheme;
+    const octave = Math.floor(degree / scale.length);
+    const index = ((degree % scale.length) + scale.length) % scale.length;
+    return root + octave * 12 + scale[index];
+  }
+
   private playMusicStep(step: number, time: number): void {
-    const melody: Record<number, number> = {
-      0: 12, 2: 7, 4: 4, 6: 7, 8: 9, 10: 7, 12: 4, 14: 2,
-      16: 0, 18: 4, 20: 7, 22: 9, 24: 7, 26: 4, 28: 2, 30: 0
-    };
-    const note = melody[step];
-    if (note !== undefined) {
-      this.musicVoice(midiToFreq(72 + note), time, 0.29, 0.037, "triangle");
-      this.musicVoice(midiToFreq(84 + note), time + 0.012, 0.18, 0.009, "sine");
+    const theme = this.musicTheme;
+    const degree = theme.melody[step] ?? -1;
+    if (degree >= 0) {
+      const lead = this.scaleNote(degree) + 24;
+      this.musicVoice(midiToFreq(lead), time, 0.29, theme.leadVolume, theme.wave);
+      this.musicVoice(midiToFreq(lead + 12), time + 0.012, 0.16, theme.leadVolume * 0.25, "sine");
     }
-    if (step % 8 === 0) {
-      const roots = [48, 43, 45, 41];
-      this.musicVoice(midiToFreq(roots[(step / 8) % 4]), time, 0.65, 0.033, "sine");
+    if (step % 4 === 0) {
+      const bassDegree = theme.bass[(step / 4) % theme.bass.length] ?? 0;
+      this.musicVoice(midiToFreq(this.scaleNote(bassDegree)), time, 0.7, theme.bassVolume, "sine");
     }
-    if (step % 4 === 2) this.musicShaker(time, 0.011);
+    if (theme.shaker && step % 4 === 2) this.musicShaker(time, 0.009);
     if (step === 0) {
-      this.musicVoice(midiToFreq(60), time, 1.1, 0.012, "sine");
-      this.musicVoice(midiToFreq(67), time + 0.02, 0.9, 0.009, "sine");
+      this.musicVoice(midiToFreq(this.scaleNote(0)), time, 1.1, 0.012, "sine");
+      this.musicVoice(midiToFreq(this.scaleNote(4)), time + 0.02, 0.9, 0.009, "sine");
     }
   }
 

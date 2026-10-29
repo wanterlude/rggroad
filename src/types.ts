@@ -4,7 +4,7 @@ import type { BiomeDecorKind, BiomeId, BiomePropKind } from "./biomes";
 
 export type GameState = "menu" | "playing" | "paused" | "dying" | "gameover";
 export type RowType = "grass" | "road" | "water" | "rail";
-export type DeathCause = "car" | "train" | "water" | "eagle" | "crocodile" | "geyser" | "log" | "tumble" | "void" | "ghost" | "coconut" | "beast" | "tide";
+export type DeathCause = "car" | "train" | "water" | "eagle" | "crocodile" | "geyser" | "log" | "tumble" | "void" | "ghost" | "coconut" | "beast" | "tide" | "sink";
 
 export interface SaveData {
   best: number;
@@ -159,6 +159,15 @@ export interface TarPitData {
   mesh?: THREE.Mesh;
 }
 
+/** Swamp mud patch: it does not break, it pulls the hero down if they linger. */
+export interface SinkholeData {
+  x: number;
+  state: "idle" | "warning";
+  timer: number;
+  mesh?: THREE.Mesh;
+  ring?: THREE.Mesh;
+}
+
 export interface BeltData {
   x0: number;
   x1: number;
@@ -197,6 +206,7 @@ export interface Row {
   fallers?: FallerData[];
   leafPiles?: LeafPileData[];
   tarPits?: TarPitData[];
+  sinkholes?: SinkholeData[];
   belts?: BeltData[];
   signs: SignData[];
   train: TrainData | null;
@@ -246,4 +256,6 @@ export type GameEvent =
   | { type: "eagle-warning"; seconds: number }
   | { type: "geyser"; volume: number }
   | { type: "tide" }
+  | { type: "wind"; seconds: number }
+  | { type: "sink"; seconds: number }
   | { type: "death"; cause: DeathCause; score: number; coins: number };

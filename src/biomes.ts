@@ -21,7 +21,9 @@ export type NewBiomeId =
   | "space"
   | "candy"
   | "prehistoric"
-  | "halloween";
+  | "halloween"
+  | "swamp"
+  | "ashlands";
 
 /** Short challenge segments inserted after every third main biome. */
 export type SpecialBiomeId = "storm" | "flood" | "crossroads";
@@ -64,6 +66,10 @@ export interface BiomeMechanics {
   belts?: boolean;
   /** Ocean: a wave periodically chases the hero from behind. */
   tide?: boolean;
+  /** Swamp: bubbling mud grabs the hero if they linger on the patch. */
+  sink?: boolean;
+  /** Ashlands: periodical gusts shove the hero one cell sideways. */
+  wind?: boolean;
 }
 
 export type BiomePropKind =
@@ -160,6 +166,7 @@ export const BIOME_ORDER: BiomeId[] = [
   "autumn",
   "forest",
   "ocean",
+  "swamp",
   "savanna",
   "desert",
   "frost",
@@ -169,6 +176,7 @@ export const BIOME_ORDER: BiomeId[] = [
   "prehistoric",
   "halloween",
   "lava",
+  "ashlands",
   "space",
   "void"
 ];
@@ -883,6 +891,123 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
       { kind: "tuft", weight: 0.15 }
     ],
     mechanics: { speed: 1.15, road: 0.4, river: 0.26, rail: 0.15, water: "logs", police: false, idle: "bat", stampede: false, fragile: "ghost" }
+  }),
+  swamp: variant("swamp", "БОЛОТО", "ocean", {
+    accent: 0xc8e86a,
+    grass: [0x4f6b3a, 0x476236, 0x5a7642],
+    grassLight: 0x78995a,
+    grassDark: 0x354d2b,
+    road: 0x3a3a32,
+    roadAlt: 0x44443a,
+    roadLine: 0xd9d6a8,
+    curb: 0x8a8a6a,
+    water: 0x3e6b53,
+    waterDeep: 0x264a38,
+    waterLight: 0x9fc9a8,
+    railBed: 0x4a4235,
+    sleeper: 0x3b2f26,
+    rail: 0x9a8f72,
+    railLight: 0xd8cba8,
+    leaves: [0x476b3a, 0x3b5c31, 0x557b45, 0x304d29],
+    leavesLight: [0x6f9158, 0x5d8049, 0x83a56a],
+    trunk: 0x4d3a28,
+    rock: 0x7a755f,
+    rockDark: 0x565341,
+    rockLight: 0xa8a288,
+    flowers: [0xd8ffb0, 0xffd84a, 0xd98cff, 0xf0f0c0],
+    ground: 0x4a6038,
+    fog: 0xb8c9a0,
+    light: 0xd8e8b8,
+    lightIntensity: 1.85,
+    hemiSky: 0xb8d8c8,
+    hemiGround: 0x2b3a26,
+    vehicleColors: [0x5d6b4a, 0x7a5a3a, 0x4a5f6a, 0x8a7a4a, 0xc8c0a0],
+    log: 0x5a4a32,
+    logDark: 0x352b1d,
+    logLight: 0x907a55,
+    pumpkin: 0x9a6a3a,
+    mushroom: 0xd8a03a,
+    crystal: 0x9fe8b0,
+    snow: 0xd8e0c0,
+    ice: 0x8ac0a0,
+    bone: 0xd8d0b0,
+    palmLeaf: 0x557b45,
+    cactus: 0x4f6b3a,
+    ember: 0xd8e86a,
+    shell: 0xc8c0a0,
+    deadWood: 0x3a3026,
+    propWeights: [
+      { kind: "deadTree", weight: 2.4 },
+      { kind: "mushroom", weight: 1.8 },
+      { kind: "bush", weight: 1.4 },
+      { kind: "stump", weight: 1.2 },
+      { kind: "rock", weight: 0.8 }
+    ],
+    decorWeights: [
+      { kind: "mushroom", weight: 0.45 },
+      { kind: "tuft", weight: 0.35 },
+      { kind: "pebble", weight: 0.15 },
+      { kind: "flower", weight: 0.1 }
+    ],
+    mechanics: { speed: 1.04, road: 0.34, river: 0.3, rail: 0.1, water: "logs", police: false, idle: "eagle", stampede: false, sink: true }
+  }),
+  ashlands: variant("ashlands", "ПЕПЕЛЬНАЯ БУРЯ", "desert", {
+    accent: 0xff8a3a,
+    grass: [0x4a3a32, 0x42332c, 0x54423a],
+    grassLight: 0x6b5348,
+    grassDark: 0x2e231e,
+    road: 0x2e2a2a,
+    roadAlt: 0x373232,
+    roadLine: 0xffb05a,
+    curb: 0x6e5a4a,
+    water: 0x4a3a32,
+    waterDeep: 0x2b211d,
+    waterLight: 0x8a6a52,
+    railBed: 0x3a302b,
+    sleeper: 0x3d2c22,
+    rail: 0x8a7462,
+    railLight: 0xe0b088,
+    leaves: [0x6b4a32, 0x5a3b28, 0x7c5a3a, 0x4a3022],
+    leavesLight: [0xa86a3a, 0x8a5530, 0xc08048],
+    trunk: 0x3a2a22,
+    rock: 0x5f5149,
+    rockDark: 0x3d332d,
+    rockLight: 0x8a7868,
+    flowers: [0xff8a3a, 0xffc06a, 0xff5a3a, 0xd8a080],
+    ground: 0x3e322b,
+    fog: 0x8a6a52,
+    light: 0xffb98a,
+    lightIntensity: 1.9,
+    hemiSky: 0xd89a72,
+    hemiGround: 0x241b17,
+    vehicleColors: [0x8a3a2a, 0x5a4a3a, 0x2e2a2a, 0xc86a3a, 0x9a8a6a],
+    log: 0x3a2a22,
+    logDark: 0x1d1511,
+    logLight: 0x8a6a4a,
+    pumpkin: 0x8a3a2a,
+    mushroom: 0x9a5a3a,
+    crystal: 0xff8a3a,
+    snow: 0x8a7a6a,
+    ice: 0x6a5a4a,
+    bone: 0xd8c8a8,
+    palmLeaf: 0x5a4a32,
+    cactus: 0x4a3a2a,
+    ember: 0xff8a3a,
+    shell: 0x9a8a6a,
+    deadWood: 0x2a1d17,
+    propWeights: [
+      { kind: "deadTree", weight: 3 },
+      { kind: "rock", weight: 1.6 },
+      { kind: "bones", weight: 1 },
+      { kind: "obelisk", weight: 0.5 },
+      { kind: "mushroom", weight: 0.4 }
+    ],
+    decorWeights: [
+      { kind: "ember", weight: 0.5 },
+      { kind: "pebble", weight: 0.35 },
+      { kind: "tuft", weight: 0.1 }
+    ],
+    mechanics: { speed: 1.28, road: 0.44, river: 0.2, rail: 0.13, water: "logs", police: false, idle: "vulture", stampede: false, wind: true }
   })
 };
 
@@ -1125,6 +1250,8 @@ export const BIOME_DESCRIPTIONS: Record<BiomeId, string> = {
   candy: "Шоколадные реки, конвейеры и конфетный самолёт. Ленты сами двигают героя.",
   prehistoric: "Смоляные ямы замедляют следующий прыжок. Обходи или перетерпи.",
   halloween: "Призрачные плиты мерцают и исчезают. Не задерживайся на них.",
+  swamp: "Трясина: пузырящаяся грязь затягивает, если задержаться. Не стой на тёмных пятнах.",
+  ashlands: "Пепельная буря: порывы ветра сбивают героя в сторону. Пережди или компенсируй прыжком.",
   storm: "Гроза: дождь, сумрак и ускоренный трафик. Держи ритм, не зевай.",
   flood: "Половодье: вместо лужаек вода. Отдых только на островках.",
   crossroads: "Перекрёсток: только дороги и светофоры. Переходи на красный.",

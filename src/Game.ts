@@ -6,6 +6,7 @@ import { World } from "./World";
 import { AudioEngine } from "./AudioEngine";
 import { UI } from "./UI";
 import { save } from "./save";
+import { currentSeason, type SeasonId } from "./season";
 import type { GameEvent, GameState } from "./types";
 import { clamp, damp } from "./utils";
 
@@ -17,6 +18,7 @@ export interface GameBootOptions {
   biome?: BiomeId;
   bot?: boolean;
   autostart?: boolean;
+  season?: SeasonId;
 }
 
 interface IsoCameraOverride {
@@ -60,7 +62,8 @@ export class Game {
 
   constructor(canvas: HTMLCanvasElement, boot: GameBootOptions = {}) {
     this.boot = boot;
-    this.sceneView = new SceneView(canvas);
+    const season = boot.season ?? currentSeason();
+    this.sceneView = new SceneView(canvas, season);
     this.ui = new UI({
       onPlay: () => this.startRun(),
       onPause: () => this.pause(),
@@ -78,6 +81,7 @@ export class Game {
     this.camAnchor.set(this.world.player.x, 0, this.world.player.z);
     this.cameraSnap = true;
     this.bindEvents();
+    this.ui.setSeason(season);
     this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted);
     this.ui.showMenu();
     this.ui.updateHUD(0);
@@ -157,12 +161,14 @@ export class Game {
   private announceBiome(): void {
     const biome = this.world.getBiome();
     const elite = this.world.getElite();
+    this.audio.setBiome(biome.id);
     this.ui.setWeather(biome.mechanics?.storm === true);
     this.ui.showBiomeBanner(elite ? `${biome.name} · НОЧЬ` : biome.name, biome.description ?? "");
   }
 
   private goMenu(): void {
     this.audio.setMusicDucked(false);
+    this.audio.setBiome("autumn");
     this.world.dispose();
     this.world = this.createWorld(true);
     this.sceneView.setEnvironmentVisible(false);
@@ -419,6 +425,12 @@ export class Game {
       } else if (event.type === "tide") {
         this.audio.tide();
         this.ui.showToast("ПРИЛИВ! Волна идёт следом", 1800);
+      } else if (event.type === "wind") {
+        this.audio.wind();
+        this.ui.showToast("ПОРЫВ ВЕТРА! Держись", 1500);
+      } else if (event.type === "sink") {
+        this.audio.sinkWarn();
+        this.ui.showToast("ТРЯСИНА! Прыгай!", 1500);
       } else if (event.type === "eagle-warning") {
         this.ui.showEagleWarning(event.seconds);
         if (event.seconds > 0) this.audio.warning();
@@ -442,6 +454,9 @@ export class Game {
 
     if (event.cause === "water" || event.cause === "crocodile" || event.cause === "tide") {
       this.audio.splash();
+      this.audio.deathTone();
+    } else if (event.cause === "sink") {
+      this.audio.sink();
       this.audio.deathTone();
     } else if (event.cause === "eagle") {
       this.audio.crash();

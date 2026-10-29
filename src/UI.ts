@@ -2,6 +2,7 @@ import { SKINS, SKIN_ORDER, type SkinId } from "./config";
 import { drawPortrait } from "./Portraits";
 import { GENERATED_ART } from "./assets/art";
 import { save } from "./save";
+import { SEASONS, type SeasonId } from "./season";
 import { fmt } from "./utils";
 import type { DeathCause } from "./types";
 import pkg from "../package.json";
@@ -47,6 +48,8 @@ export class UI {
     biomeBannerText: $("biomeBannerText"),
     menuBest: $("menuBest"),
     menuCoins: $("menuCoins"),
+    seasonChip: $("seasonChip"),
+    seasonChipLabel: $("seasonChipLabel"),
     skinRail: $("skinRail"),
     skinDock: $("skinDock"),
     skinPrev: $<HTMLButtonElement>("skinPrev"),
@@ -275,6 +278,16 @@ export class UI {
     this.refs.night.classList.toggle("is-night", night);
   }
 
+  /** Seasonal event badge in the menu; hidden outside Halloween/New Year. */
+  setSeason(season: SeasonId): void {
+    const info = SEASONS[season];
+    const chip = this.refs.seasonChip;
+    chip.hidden = season === "none";
+    chip.dataset.season = season;
+    this.refs.seasonChipLabel.textContent = info.label;
+    document.documentElement.dataset.season = season;
+  }
+
   /** A 50-row milestone badge. */
   showMilestone(score: number): void {
     this.refs.milestoneValue.textContent = String(score);
@@ -352,7 +365,9 @@ export class UI {
                             ? "ТОП!"
                             : options.cause === "tide"
                               ? "ВОЛНА!"
-                              : "БУМ!";
+                              : options.cause === "sink"
+                                ? "ЗАСОСАЛО!"
+                                : "БУМ!";
     const message =
       options.cause === "water"
         ? "Бревно уплыло. В следующий раз прыгай точнее."
@@ -378,7 +393,9 @@ export class UI {
                             ? "Стадо несётся через саванну. Пережди волну."
                             : options.cause === "tide"
                               ? "Прилив догнал. Не отставай — волна идёт следом."
-                              : "Машины не тормозят. Проверь оба ряда.";
+                              : options.cause === "sink"
+                                ? "Трясина затянула. Не задерживайся на пузырящейся грязи."
+                                : "Машины не тормозят. Проверь оба ряда.";
     this.refs.overTitle.textContent = title;
     this.refs.overMessage.textContent = message;
     this.refs.finalScore.textContent = fmt(options.score);
