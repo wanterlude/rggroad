@@ -311,7 +311,11 @@ export class UI {
                       ? "ПРОВАЛ!"
                       : options.cause === "ghost"
                         ? "ИСЧЕЗ!"
-                        : "БУМ!";
+                        : options.cause === "coconut"
+                          ? "БОМ!"
+                          : options.cause === "beast"
+                            ? "ТОП!"
+                            : "БУМ!";
     const message =
       options.cause === "water"
         ? "Бревно уплыло. В следующий раз прыгай точнее."
@@ -331,7 +335,11 @@ export class UI {
                       ? "Плита треснула и провалилась. Не задерживайся на трещинах."
                       : options.cause === "ghost"
                         ? "Призрачная плита растворилась. Не стой на ней."
-                        : "Машины не тормозят. Проверь оба ряда.";
+                        : options.cause === "coconut"
+                          ? "Кокос свалился на голову. Тень растёт — уходи с клетки."
+                          : options.cause === "beast"
+                            ? "Стадо несётся через саванну. Пережди волну."
+                            : "Машины не тормозят. Проверь оба ряда.";
     this.refs.overTitle.textContent = title;
     this.refs.overMessage.textContent = message;
     this.refs.finalScore.textContent = fmt(options.score);

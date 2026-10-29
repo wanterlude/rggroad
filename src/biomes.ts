@@ -44,14 +44,16 @@ export interface BiomeMechanics {
   geysers?: boolean;
   /** Jump duration multiplier. 1.55 = floaty low-gravity hops. */
   gravity?: number;
-  /** A hazard that rolls across safe rows: forest logs or desert tumbleweeds. */
-  rollers?: "log" | "tumbleweed";
+  /** A hazard that rolls across safe rows: forest logs, desert tumbleweeds, savanna herds. */
+  rollers?: "log" | "tumbleweed" | "beast";
   /** City: cars stop at red and drive at green. */
   lights?: boolean;
   /** Storm intermediate: rain overlay and a darker sky. */
   storm?: boolean;
   /** Void and Halloween: floor tiles that crack and disappear. */
   fragile?: "void" | "ghost";
+  /** Jungle: coconuts that fall onto a cell after a growing shadow. */
+  fallers?: "coconut";
 }
 
 export type BiomePropKind =
@@ -650,7 +652,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
       { kind: "tuft", weight: 0.4 },
       { kind: "pebble", weight: 0.2 }
     ],
-    mechanics: { speed: 1.12, road: 0.46, river: 0.2, rail: 0.14, water: "crocodile", police: false, idle: "vulture", stampede: false }
+    mechanics: { speed: 1.12, road: 0.46, river: 0.2, rail: 0.14, water: "crocodile", police: false, idle: "vulture", stampede: false, rollers: "beast" }
   }),
   jungle: variant("jungle", "ДЖУНГЛИ", "forest", {
     grass: [0x4f8f3e, 0x458237, 0x5d9f48],
@@ -684,7 +686,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
       { kind: "mushroom", weight: 0.2 },
       { kind: "pebble", weight: 0.12 }
     ],
-    mechanics: { speed: 1.06, road: 0.32, river: 0.42, rail: 0.11, water: "lily", police: false, idle: "eagle", stampede: false }
+    mechanics: { speed: 1.06, road: 0.32, river: 0.42, rail: 0.11, water: "lily", police: false, idle: "eagle", stampede: false, fallers: "coconut" }
   }),
   city: variant("city", "ГОРОД", "autumn", {
     grass: [0x6f8a5c, 0x667f54, 0x7c9668],
@@ -1084,8 +1086,8 @@ export const BIOME_DESCRIPTIONS: Record<BiomeId, string> = {
   frost: "Скользко: после приземления тебя проносит ещё на клетку. Тормози заранее и не прыгай впритык.",
   lava: "Гейзеры: из трещин бьёт огонь. Пульсирующее кольцо — предупреждение, уходи с клетки.",
   void: "Финал цикла: НЛО вместо орла и плиты, которые трескаются и проваливаются.",
-  savanna: "Стервятник кружит сверху, в воде крокодилы. Не останавливайся.",
-  jungle: "Много воды и лилий — прыгай по островкам.",
+  savanna: "Стадо несётся через лужайки. Пережди волну или обойди её.",
+  jungle: "С деревьев падают кокосы: тень растёт — уходи с клетки.",
   city: "Светофоры: на красный машины стоят. Переходи, когда поток замер.",
   space: "Низкая гравитация: прыжок дольше и выше. Держи ритм и рассчитывай траекторию.",
   candy: "Шоколадные реки и конфетный самолёт. Сладко и опасно.",

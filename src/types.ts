@@ -4,7 +4,7 @@ import type { BiomeDecorKind, BiomeId, BiomePropKind } from "./biomes";
 
 export type GameState = "menu" | "playing" | "paused" | "dying" | "gameover";
 export type RowType = "grass" | "road" | "water" | "rail";
-export type DeathCause = "car" | "train" | "water" | "eagle" | "crocodile" | "geyser" | "log" | "tumble" | "void" | "ghost";
+export type DeathCause = "car" | "train" | "water" | "eagle" | "crocodile" | "geyser" | "log" | "tumble" | "void" | "ghost" | "coconut" | "beast";
 
 export interface SaveData {
   best: number;
@@ -113,7 +113,7 @@ export interface GeyserData {
   erupting?: boolean;
 }
 
-export type RollerKind = "log" | "tumbleweed";
+export type RollerKind = "log" | "tumbleweed" | "beast";
 
 export interface RollerData {
   x: number;
@@ -137,6 +137,16 @@ export interface TrafficLightData {
 }
 
 export type FragileKind = "void" | "ghost";
+
+export interface FallerData {
+  x: number;
+  period: number;
+  phase: number;
+  state: "idle" | "warn" | "fall" | "impact";
+  timer: number;
+  shadow?: THREE.Mesh;
+  nut?: THREE.Group;
+}
 
 export interface FragileTileData {
   x: number;
@@ -164,6 +174,7 @@ export interface Row {
   rollers?: RollerData[];
   light?: TrafficLightData;
   fragile?: FragileTileData[];
+  fallers?: FallerData[];
   signs: SignData[];
   train: TrainData | null;
   dir: 1 | -1;

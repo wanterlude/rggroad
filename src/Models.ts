@@ -390,6 +390,33 @@ export function buildRoller(kind: RollerKind, biomeId?: BiomeId): THREE.Group {
     return group;
   }
 
+  if (kind === "beast") {
+    spin.position.y = 0.02;
+    const coat = biome?.deadWood ?? 0x5a4a3a;
+    const dark = biome?.logDark ?? 0x2e2620;
+    const light = biome?.bone ?? 0xd8c8b0;
+    const cubes: CubeSpec[] = [
+      { x: 0, y: 0.62, z: 0, sx: 0.95, sy: 0.42, sz: 0.46, color: coat },
+      { x: 0, y: 0.4, z: 0, sx: 0.8, sy: 0.16, sz: 0.34, color: light },
+      { x: 0.44, y: 0.74, z: 0, sx: 0.36, sy: 0.34, sz: 0.38, color: coat },
+      { x: 0.64, y: 0.68, z: 0, sx: 0.24, sy: 0.22, sz: 0.28, color: dark },
+      { x: 0.4, y: 0.94, z: 0.13, sx: 0.06, sy: 0.22, sz: 0.06, color: light },
+      { x: 0.4, y: 0.94, z: -0.13, sx: 0.06, sy: 0.22, sz: 0.06, color: light },
+      { x: -0.52, y: 0.66, z: 0, sx: 0.16, sy: 0.16, sz: 0.12, color: dark },
+      { x: 0.7, y: 0.72, z: 0.1, sx: 0.05, sy: 0.05, sz: 0.05, color: 0x20140c },
+      { x: 0.7, y: 0.72, z: -0.1, sx: 0.05, sy: 0.05, sz: 0.05, color: 0x20140c }
+    ];
+    for (const dx of [-0.32, 0.26]) {
+      for (const dz of [-0.17, 0.17]) {
+        cubes.push({ x: dx, y: 0.24, z: dz, sx: 0.15, sy: 0.42, sz: 0.15, color: dark });
+      }
+    }
+    spin.add(createVoxelMesh(cubes));
+    group.scale.setScalar(1.15);
+    group.add(createBlobShadow(1.5, 0.72, 0.014));
+    return group;
+  }
+
   spin.position.y = 0.5;
   const wood = 0x8a6738;
   const dark = 0x55401f;

@@ -31,6 +31,7 @@ import type {
   CarData,
   CoinData,
   DeathCause,
+  FallerData,
   FragileKind,
   FragileTileData,
   GameEvent,
@@ -38,6 +39,7 @@ import type {
   LogData,
   PlayerState,
   PropData,
+  RollerData,
   RollerKind,
   Row,
   RowType,
@@ -91,6 +93,10 @@ const GEYSER_ERUPT_SECONDS = 0.7;
 // Fragile floor: crack for 1.2 s, then the plate is gone for 3.2 s.
 const FRAGILE_WARN_SECONDS = 1.2;
 const FRAGILE_GONE_SECONDS = 3.2;
+// Jungle coconuts: shadow grows for 1.2 s, the nut falls for 0.3 s.
+const FALLER_WARN_SECONDS = 1.2;
+const FALLER_FALL_SECONDS = 0.3;
+const FALLER_IMPACT_SECONDS = 0.35;
 // City traffic cycle: green -> amber -> red.
 const LIGHT_GREEN_SECONDS = 4.4;
 const LIGHT_AMBER_SECONDS = 0.8;
@@ -100,6 +106,16 @@ const geyserVentGeometry = new THREE.CircleGeometry(0.24, 20);
 const fragileTileGeometry = new THREE.BoxGeometry(0.94, 0.06, 0.94);
 const fragileHoleGeometry = new THREE.PlaneGeometry(0.94, 0.94);
 const fragileCrackGeometry = new THREE.BoxGeometry(0.04, 0.02, 0.62);
+const coconutGeometry = new THREE.IcosahedronGeometry(0.32, 0);
+const coconutMaterial = new THREE.MeshLambertMaterial({ color: 0x6b4a2c, flatShading: true });
+const coconutStemGeometry = new THREE.BoxGeometry(0.07, 0.13, 0.07);
+const fallerShadowGeometry = new THREE.CircleGeometry(0.42, 18);
+const fallerShadowMaterial = new THREE.MeshBasicMaterial({
+  color: 0x000000,
+  transparent: true,
+  opacity: 0.32,
+  depthWrite: false
+});
 const lampGeometry = new THREE.CircleGeometry(0.115, 14);
 const lightHousingGeometry = new THREE.BoxGeometry(0.46, 1.05, 0.28);
 const lightPoleGeometry = new THREE.CylinderGeometry(0.055, 0.055, 3.4, 8);
@@ -251,7 +267,8 @@ export class World {
           );
           const geyser = (spawnRow.geysers ?? []).some((g) => Math.abs(g.x - x) < 0.8);
           const fragile = (spawnRow.fragile ?? []).some((tile) => Math.abs(tile.x - x) < 0.8);
-          if (!blocked && !geyser && !fragile) {
+          const faller = (spawnRow.fallers ?? []).some((drop) => Math.abs(drop.x - x) < 0.8);
+          if (!blocked && !geyser && !fragile && !faller) {
             spawnX = x;
             break;
           }
@@ -428,12 +445,14 @@ export class World {
     for (const roller of row.rollers ?? []) {
       const group = buildRoller(roller.kind, row.biome);
       group.position.set(roller.x, 0, 0);
+      if (roller.kind === "beast") group.rotation.y = roller.dir === 1 ? 0 : Math.PI;
       roller.group = group;
       roller.spin = group.userData.spin as THREE.Group | undefined;
       row.group.add(group);
     }
 
     for (const fragile of row.fragile ?? []) this.buildFragileTile(fragile, row);
+    for (const faller of row.fallers ?? []) this.buildFaller(faller, row);
 
     if (row.light) this.buildTrafficLight(row);
 
@@ -636,8 +655,41 @@ export class World {
     if (mechanics.fragile && this.mode !== "menu" && this.rng() < 0.5) {
       this.addFragile(row, mechanics.fragile);
     }
+    if (mechanics.fallers && this.mode !== "menu" && this.rng() < 0.48) {
+      this.addFaller(row);
+    }
     if (options.allowCoin) this.addCoin(row, 0.4, -3.8, 3.8);
     return row;
+  }
+
+  /** Jungle: a coconut drops onto a cell after its shadow has grown. */
+  private addFaller(row: Row): void {
+    const count = this.rng() < 0.55 ? 1 : 2;
+    const lane = [-3, -2, -1, 0, 1, 2, 3];
+    for (let i = lane.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      const swap = lane[i];
+      lane[i] = lane[j];
+      lane[j] = swap;
+    }
+    const fallers: FallerData[] = [];
+    for (const x of lane) {
+      if (fallers.length >= count) break;
+      if (row.props.some((prop) => prop.collider && Math.abs(prop.x - x) < prop.radius + 0.55)) continue;
+      if ((row.geysers ?? []).some((geyser) => Math.abs(geyser.x - x) < 0.8)) continue;
+      if ((row.rollers ?? []).some((roller) => Math.abs(roller.x - x) < roller.radius + 0.6)) continue;
+      if ((row.fragile ?? []).some((tile) => Math.abs(tile.x - x) < 0.8)) continue;
+      const period =
+        FALLER_WARN_SECONDS + FALLER_FALL_SECONDS + FALLER_IMPACT_SECONDS + 2.4 + this.rng() * 1.5;
+      fallers.push({
+        x,
+        period,
+        phase: this.rng() * period,
+        state: "idle",
+        timer: 0
+      });
+    }
+    if (fallers.length > 0) row.fallers = fallers;
   }
 
   /** Void and Halloween ground plates that crack and drop out from under you. */
@@ -660,10 +712,27 @@ export class World {
     if (tiles.length > 0) row.fragile = tiles;
   }
 
-  /** Forest logs and desert tumbleweeds cross the safe rows from the side. */
+  /** Forest logs, desert tumbleweeds, and savanna herds crossing safe rows. */
   private addRoller(row: Row, kind: RollerKind): void {
     const dir: 1 | -1 = this.rng() < 0.5 ? 1 : -1;
     const edge = HALF_SPAN + 7;
+    if (kind === "beast") {
+      const count = 2 + Math.floor(this.rng() * 2);
+      const speed = rr(this.rng, 2.4, 3.6);
+      const herd: RollerData[] = [];
+      for (let i = 0; i < count; i++) {
+        herd.push({
+          x: -dir * (edge + i * 2.3),
+          dir,
+          speed,
+          radius: 0.55,
+          kind,
+          phase: this.rng() * Math.PI * 2
+        });
+      }
+      row.rollers = herd;
+      return;
+    }
     row.rollers = [
       {
         x: -dir * edge,
@@ -795,6 +864,7 @@ export class World {
       if (row.props.some((p) => p.collider && Math.abs(p.x - x) < 1.05)) continue;
       if (row.geysers?.some((g) => Math.abs(g.x - x) < 0.75)) continue;
       if (row.fragile?.some((tile) => Math.abs(tile.x - x) < 0.75)) continue;
+      if (row.fallers?.some((faller) => Math.abs(faller.x - x) < 0.75)) continue;
       row.coin = {
         x,
         z: row.z,
@@ -969,6 +1039,7 @@ export class World {
     this.updatePlayer(dt, time);
     this.updateGeysers(dt, time);
     this.updateFragile(dt, time);
+    this.updateFallers(dt, time);
     this.updateIdleHazard(dt);
     this.updateCoins(time);
     this.updateRowVisibility();
@@ -1140,8 +1211,117 @@ export class World {
     fragile.hole = hole;
   }
 
-  private updateFragile(dt: number, time: number): void {
+  private buildFaller(faller: FallerData, row: Row): void {
+    const shadow = new THREE.Mesh(fallerShadowGeometry, fallerShadowMaterial);
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.set(faller.x, 0.026, 0);
+    shadow.visible = false;
+    const warnRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.5, 0.62, 20),
+      new THREE.MeshBasicMaterial({
+        color: 0xffb35c,
+        transparent: true,
+        opacity: 0.65,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      })
+    );
+    warnRing.position.z = 0.002;
+    shadow.add(warnRing);
+    const nut = new THREE.Group();
+    const shell = new THREE.Mesh(coconutGeometry, coconutMaterial);
+    shell.scale.setScalar(1.2);
+    const stem = new THREE.Mesh(
+      coconutStemGeometry,
+      new THREE.MeshLambertMaterial({ color: 0x4f8b3e })
+    );
+    stem.position.y = 0.4;
+    nut.add(shell, stem);
+    nut.position.set(faller.x, 6, 0);
+    nut.visible = false;
+    row.group.add(shadow, nut);
+    faller.shadow = shadow;
+    faller.nut = nut;
+  }
+
+  private updateFallers(dt: number, time: number): void {
     if (this.mode === "menu") return;
+    const p = this.player;
+    if (p.dead) return;
+    const nearMin = p.z - 6;
+    const nearMax = p.z + 20;
+    for (const row of this.rows.values()) {
+      if (!row.fallers || row.z < nearMin || row.z > nearMax) continue;
+      for (const faller of row.fallers) {
+        const local = ((time + faller.phase) % faller.period + faller.period) % faller.period;
+        const warnEnd = FALLER_WARN_SECONDS;
+        const fallEnd = warnEnd + FALLER_FALL_SECONDS;
+        const impactEnd = fallEnd + FALLER_IMPACT_SECONDS;
+        const next: FallerData["state"] =
+          local < warnEnd
+            ? "warn"
+            : local < fallEnd
+              ? "fall"
+              : local < impactEnd
+                ? "impact"
+                : "idle";
+
+        if (next !== faller.state) {
+          faller.state = next;
+          if (next === "warn") {
+            if (faller.shadow) {
+              faller.shadow.visible = true;
+              faller.shadow.scale.setScalar(0.55);
+            }
+          } else if (next === "fall") {
+            if (faller.nut) faller.nut.visible = true;
+            if (faller.shadow) {
+              faller.shadow.visible = true;
+              faller.shadow.scale.setScalar(1);
+            }
+          } else if (next === "impact") {
+            if (faller.shadow) faller.shadow.visible = false;
+            if (faller.nut) {
+              faller.nut.position.y = 0.32;
+              faller.nut.scale.set(1.3, 0.4, 1.3);
+            }
+            this.sceneView.particles.burstDust(faller.x, row.z, 12, 0xb08a52);
+            if (Math.abs(row.z - p.z) < 10) this.events.push({ type: "bump" });
+            if (
+              Math.abs(p.z - row.z) < 0.55 &&
+              Math.abs(p.x - faller.x) < 0.45 &&
+              p.y < 1.0
+            ) {
+              this.die("coconut");
+              return;
+            }
+          } else {
+            if (faller.shadow) faller.shadow.visible = false;
+            if (faller.nut) {
+              faller.nut.visible = false;
+              faller.nut.scale.set(1, 1, 1);
+            }
+          }
+        }
+
+        if (local >= warnEnd && local < fallEnd) {
+          const t = (local - warnEnd) / FALLER_FALL_SECONDS;
+          if (faller.nut) {
+            faller.nut.position.set(faller.x, 6 - t * t * 5.68, 0);
+            faller.nut.rotation.set(t * 4, t * 2, t * 3);
+          }
+          if (faller.shadow) {
+            faller.shadow.visible = true;
+            faller.shadow.scale.setScalar(1);
+          }
+        } else if (local < warnEnd && faller.shadow) {
+          faller.shadow.scale.setScalar(0.55 + (local / warnEnd) * 0.45);
+        }
+      }
+    }
+  }
+
+  private updateFragile(dt: number, time: number): void {    if (this.mode === "menu") return;
     const p = this.player;
     if (p.dead) return;
     const nearMin = p.z - 6;
@@ -1296,7 +1476,14 @@ export class World {
       if (roller.x > reach) roller.x = -reach;
       else if (roller.x < -reach) roller.x = reach;
       if (roller.group) roller.group.position.x = roller.x;
-      if (roller.spin) roller.spin.rotation.z -= (roller.dir * roller.speed * dt) / 0.32;
+      if (roller.kind === "beast") {
+        if (roller.spin) {
+          roller.spin.position.y =
+            0.02 + Math.abs(Math.sin(this.time * 11 + roller.phase)) * 0.05;
+        }
+      } else if (roller.spin) {
+        roller.spin.rotation.z -= (roller.dir * roller.speed * dt) / 0.32;
+      }
       if (Math.random() < dt * 9) {
         this.sceneView.particles.spawn({
           x: roller.x + (Math.random() - 0.5) * 0.25,
@@ -1308,7 +1495,8 @@ export class World {
           gravity: 3.2,
           life: 0.25 + Math.random() * 0.2,
           size: 0.04 + Math.random() * 0.04,
-          color: roller.kind === "log" ? 0xb98b56 : 0xd8b27a,
+          color:
+            roller.kind === "beast" ? 0xd8c08a : roller.kind === "log" ? 0xb98b56 : 0xd8b27a,
           spin: 4
         });
       }
@@ -1317,7 +1505,7 @@ export class World {
         Math.abs(p.z - row.z) < 0.62 &&
         Math.abs(p.x - roller.x) < roller.radius + 0.3
       ) {
-        this.die(roller.kind === "log" ? "log" : "tumble");
+        this.die(roller.kind === "log" ? "log" : roller.kind === "beast" ? "beast" : "tumble");
         return;
       }
     }
@@ -1912,6 +2100,9 @@ export class World {
     for (const fragile of row.fragile ?? []) {
       if (Math.abs(fragile.x - x) < 0.7) return false;
     }
+    for (const faller of row.fallers ?? []) {
+      if (Math.abs(faller.x - x) < 0.7) return false;
+    }
     return true;
   }
 
@@ -2050,6 +2241,12 @@ export class World {
       const color = cause === "void" ? 0x8b6ff0 : 0xd8a0ff;
       this.sceneView.particles.burstDust(p.x, p.z, 16, color);
       this.sceneView.particles.burstFeathers(p.x, p.z, [color, 0x2a1a33, skin.body, 0xfff7e2]);
+    } else if (cause === "coconut" || cause === "beast") {
+      this.shake = Math.max(this.shake, 0.6);
+      const skin = SKINS[this.skinId];
+      const color = cause === "coconut" ? 0xb08a52 : 0xd8c08a;
+      this.sceneView.particles.burstDust(p.x, p.z, 14, color);
+      this.sceneView.particles.burstFeathers(p.x, p.z, [color, 0x6b4a2c, skin.body, 0xfff7e2]);
     } else {
       this.shake = Math.max(this.shake, cause === "train" ? 1.05 : 0.7);
       const skin = SKINS[this.skinId];
