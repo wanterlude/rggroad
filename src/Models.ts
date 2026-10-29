@@ -3003,8 +3003,9 @@ export function buildCharacter(skinId: SkinId): THREE.Group {
   else if (skin.style === "amelia") cubes = buildAmelia(skin);
   else if (skin.style === "nyamuras") cubes = buildNyamuras(skin);
   else if (skin.style === "knjazevdesu") cubes = buildKnjazevdesu(skin);
+  else if (skin.style === "lilanei") cubes = buildLilanei(skin);
   else cubes = buildDitoshey(skin);
-  if (skin.style !== "moryaka" && skin.style !== "severina" && skin.style !== "snezha" && skin.style !== "meowlody" && skin.style !== "miliray" && skin.style !== "yuchii" && skin.style !== "alaskanyan" && skin.style !== "alysque" && skin.style !== "amelia" && skin.style !== "nyamuras" && skin.style !== "knjazevdesu" && skin.style !== "higanbanban") {
+  if (skin.style !== "moryaka" && skin.style !== "severina" && skin.style !== "snezha" && skin.style !== "meowlody" && skin.style !== "miliray" && skin.style !== "yuchii" && skin.style !== "alaskanyan" && skin.style !== "alysque" && skin.style !== "amelia" && skin.style !== "nyamuras" && skin.style !== "knjazevdesu" && skin.style !== "higanbanban" && skin.style !== "lilanei") {
     addHairDepth(cubes, skin.mane, "long");
     addRearDetails(cubes, skin.style);
     addBackOutfit(cubes, skin.style);
@@ -3034,4 +3035,201 @@ function shade(hex: number, amount: number): number {
 
 
 
+
+
+/**
+ * lilanei — red-haired catgirl VTuber, summer beach outfit.
+ * Heterochromia: green left eye, blue right eye; white streak in the fringe,
+ * white cat ears with cream tufts, blue hair gem, white bikini top with a bow,
+ * sheer off-shoulder cover-up, white shorts and a fluffy red tail.
+ */
+function buildLilanei(_skin: SkinDef): CubeSpec[] {
+  const c: CubeSpec[] = [];
+  const skin = 0xffe6d8;
+  const skinShade = 0xf0cbb8;
+  const skinWarm = 0xf7c9b7;
+  const hair = 0xd72b3c;
+  const hairDark = 0x991a2a;
+  const hairLight = 0xf25a62;
+  const white = 0xf6f2ea;
+  const whiteShade = 0xd9d2c4;
+  const sand = 0x2f2723;
+  const teal = 0x2f93a8;
+  const green = 0x4fae62;
+  const blue = 0x4aa8dc;
+  const gold = 0xf1c75a;
+  const coral = 0xf27f8c;
+  const straw = 0xe6c17a;
+  const strawDark = 0xc39a55;
+
+  // Bare feet and slim sandals.
+  for (const side of [-1, 1]) {
+    part(c, sand, side * 0.145, 0.0, 0.03, 0.17, 0.055, 0.28);
+    part(c, skin, side * 0.145, 0.04, 0.02, 0.14, 0.08, 0.25);
+    part(c, whiteShade, side * 0.145, 0.11, 0.0, 0.14, 0.035, 0.23);
+    part(c, skin, side * 0.145, 0.13, 0.0, 0.135, 0.4, 0.16);
+    part(c, skinWarm, side * 0.145, 0.16, 0.07, 0.12, 0.14, 0.06);
+    // White shorts cuff over the thigh.
+    part(c, white, side * 0.145, 0.5, 0.0, 0.17, 0.09, 0.18);
+    part(c, whiteShade, side * 0.145, 0.49, 0.08, 0.15, 0.025, 0.02);
+  }
+
+  // White shorts with a thin teal belt and a tied fabric waist.
+  part(c, white, 0, 0.56, 0.0, 0.46, 0.2, 0.34);
+  part(c, whiteShade, 0, 0.54, 0.02, 0.43, 0.035, 0.31);
+  part(c, teal, 0, 0.7, 0.0, 0.48, 0.045, 0.36);
+  part(c, gold, 0, 0.72, 0.19, 0.05, 0.05, 0.025);
+  part(c, 0xffffff, -0.06, 0.74, 0.17, 0.11, 0.04, 0.03, -0.25);
+  part(c, 0xffffff, 0.06, 0.74, 0.17, 0.11, 0.04, 0.03, 0.25);
+
+  // Bare midriff and a soft navel shadow.
+  part(c, skin, 0, 0.72, 0.0, 0.35, 0.18, 0.26);
+  part(c, skinShade, 0, 0.755, 0.14, 0.13, 0.018, 0.02);
+  part(c, 0xffffff, 0, 0.79, 0.14, 0.02, 0.02, 0.012);
+
+  // White bikini top with a central bow.
+  part(c, white, 0, 0.88, 0.0, 0.43, 0.17, 0.31);
+  for (const side of [-1, 1]) {
+    part(c, white, side * 0.13, 0.9, 0.16, 0.19, 0.14, 0.09);
+    part(c, 0xffffff, side * 0.13, 0.93, 0.21, 0.13, 0.06, 0.03);
+    part(c, whiteShade, side * 0.13, 0.84, 0.19, 0.16, 0.02, 0.04);
+    // Thin halter straps.
+    part(c, white, side * 0.205, 0.99, 0.06, 0.025, 0.16, 0.04);
+    part(c, white, side * 0.08, 1.01, 0.04, 0.02, 0.14, 0.03);
+  }
+  part(c, 0xffffff, 0, 0.89, 0.22, 0.13, 0.08, 0.04);
+  part(c, 0xffffff, 0, 0.9, 0.23, 0.06, 0.06, 0.02);
+  part(c, whiteShade, 0, 0.86, 0.22, 0.02, 0.06, 0.02);
+
+  // Sheer off-shoulder sleeves; slightly warmer white than the top.
+  for (const side of [-1, 1]) {
+    part(c, 0xf1ece1, side * 0.31, 0.84, -0.01, 0.16, 0.3, 0.27);
+    part(c, 0xe7e0d2, side * 0.35, 0.68, 0.03, 0.12, 0.24, 0.2);
+    part(c, 0xf7f3ea, side * 0.3, 0.94, 0.02, 0.17, 0.05, 0.23);
+    part(c, skin, side * 0.33, 0.63, 0.09, 0.1, 0.1, 0.1);
+    part(c, 0xffffff, side * 0.28, 0.72, 0.13, 0.03, 0.24, 0.025);
+  }
+
+  // Neck, white choker with a ribbon and a tiny shell pendant.
+  part(c, skin, 0, 1.01, 0.0, 0.17, 0.12, 0.17);
+  part(c, white, 0, 1.05, 0.01, 0.235, 0.045, 0.19);
+  part(c, 0xffffff, 0, 1.08, 0.13, 0.13, 0.055, 0.035);
+  part(c, 0xffffff, -0.035, 1.09, 0.14, 0.065, 0.04, 0.02, -0.35);
+  part(c, 0xffffff, 0.035, 1.09, 0.14, 0.065, 0.04, 0.02, 0.35);
+  part(c, gold, 0, 1.035, 0.16, 0.028, 0.045, 0.018);
+
+  // Head and face.
+  part(c, skin, 0, 1.1, 0.08, 0.44, 0.36, 0.34);
+  part(c, skinShade, 0, 1.1, 0.03, 0.43, 0.34, 0.33);
+
+  // Layered red hair: crown, long back mass, face-framing locks and a white
+  // streak. Separate blocks keep the head from reading as one red slab.
+  part(c, hair, 0, 1.16, -0.08, 0.56, 0.38, 0.34);
+  part(c, hair, 0, 1.38, 0.0, 0.52, 0.12, 0.34);
+  part(c, hairDark, 0, 1.13, -0.28, 0.5, 0.42, 0.1);
+  part(c, hair, 0, 0.62, -0.29, 0.46, 0.72, 0.11);
+  part(c, hairDark, 0, 0.38, -0.3, 0.4, 0.22, 0.09);
+  part(c, hairLight, 0, 0.64, -0.35, 0.04, 0.4, 0.012);
+  part(c, 0xfff8ef, 0.1, 0.9, -0.35, 0.075, 0.56, 0.012);
+  for (const side of [-1, 1]) {
+    part(c, hair, side * 0.29, 0.78, -0.07, 0.09, 0.88, 0.26);
+    part(c, hairDark, side * 0.3, 0.78, -0.08, 0.04, 0.5, 0.2);
+    part(c, hairLight, side * 0.25, 0.68, -0.01, 0.03, 0.38, 0.025);
+    part(c, hair, side * 0.235, 1.38, 0.1, 0.15, 0.12, 0.26);
+    part(c, hair, side * 0.2, 1.17, 0.285, 0.09, 0.28, 0.035);
+  }
+
+  // Fringe with an asymmetric white streak over the blue eye.
+  part(c, hair, 0, 1.44, 0.235, 0.5, 0.11, 0.055);
+  part(c, hair, -0.2, 1.36, 0.275, 0.15, 0.17, 0.045);
+  part(c, hair, -0.08, 1.37, 0.285, 0.14, 0.15, 0.045);
+  part(c, hair, 0.05, 1.35, 0.29, 0.12, 0.19, 0.045);
+  part(c, hair, 0.18, 1.34, 0.285, 0.12, 0.2, 0.045);
+  part(c, hairDark, 0.19, 1.23, 0.295, 0.06, 0.18, 0.02);
+  part(c, hairLight, -0.11, 1.4, 0.3, 0.035, 0.12, 0.018);
+  // White streak framing the blue eye, not covering it.
+  part(c, 0xfff8ef, 0.205, 1.31, 0.302, 0.06, 0.26, 0.024);
+  part(c, 0xfff8ef, 0.23, 1.18, 0.288, 0.05, 0.18, 0.02);
+  part(c, 0xf1e9da, 0.2, 1.43, 0.295, 0.045, 0.08, 0.018);
+
+  // Wide straw sunhat from the beach reference, with a white ribbon and a
+  // hibiscus tucked behind the right ear. The cat ears poke through the brim.
+  part(c, straw, 0, 1.57, 0.02, 0.72, 0.045, 0.62);
+  part(c, strawDark, 0, 1.56, 0.02, 0.7, 0.022, 0.6);
+  part(c, straw, 0, 1.6, -0.01, 0.42, 0.2, 0.38);
+  part(c, strawDark, 0, 1.6, 0.0, 0.44, 0.022, 0.4);
+  part(c, straw, 0, 1.79, -0.01, 0.3, 0.035, 0.28);
+  part(c, 0xffffff, 0, 1.65, 0.18, 0.44, 0.035, 0.035);
+  part(c, 0xffffff, 0.12, 1.66, 0.2, 0.11, 0.07, 0.045, 0.3);
+  part(c, 0xffffff, 0.085, 1.67, 0.2, 0.07, 0.055, 0.04, -0.3);
+  part(c, 0xffffff, 0.1, 1.65, 0.21, 0.032, 0.032, 0.02);
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    part(c, 0xff9fb3, 0.28 + Math.cos(a) * 0.032, 1.63 + Math.sin(a) * 0.028, 0.18, 0.04, 0.032, 0.018);
+  }
+  part(c, gold, 0.28, 1.63, 0.205, 0.028, 0.028, 0.012);
+
+  // Cat ears: red outside, cream tufts, coral inner ear. They sit outside the
+  // hat brim so the silhouette still reads as a catgirl.
+  for (const side of [-1, 1]) {
+    part(c, hair, side * 0.36, 1.5, 0.03, 0.16, 0.18, 0.13, side * 0.15);
+    part(c, hair, side * 0.395, 1.62, 0.0, 0.1, 0.12, 0.09, side * 0.15);
+    part(c, hairDark, side * 0.39, 1.52, 0.11, 0.09, 0.12, 0.02, side * 0.15);
+    part(c, coral, side * 0.385, 1.52, 0.125, 0.065, 0.1, 0.018, side * 0.15);
+    part(c, 0xfff8ef, side * 0.43, 1.54, 0.12, 0.09, 0.09, 0.06);
+    part(c, 0xfff8ef, side * 0.38, 1.65, 0.04, 0.07, 0.06, 0.06);
+    part(c, 0xfff8ef, side * 0.34, 1.51, 0.14, 0.055, 0.05, 0.03);
+  }
+
+  // Ahoge and blue gem hairpin.
+  part(c, hairDark, 0.015, 1.62, 0.05, 0.035, 0.12, 0.03, 0.28);
+  part(c, hair, 0.05, 1.7, 0.08, 0.035, 0.1, 0.03, -0.55);
+  part(c, hairLight, 0.075, 1.76, 0.11, 0.03, 0.06, 0.02, 0.9);
+  part(c, 0x3d78c9, 0.0, 1.49, 0.245, 0.07, 0.075, 0.035);
+  part(c, 0x8ed8e8, 0.0, 1.505, 0.265, 0.035, 0.04, 0.015);
+
+  // White hibiscus pin behind the left ear.
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    part(c, 0xffffff, -0.31 + Math.cos(a) * 0.045, 1.45 + Math.sin(a) * 0.04, 0.1, 0.05, 0.04, 0.02);
+  }
+  part(c, gold, -0.31, 1.47, 0.13, 0.035, 0.035, 0.015);
+
+  // Heterochromia: green left, blue right. Dark red lashes and soft brows.
+  for (const side of [-1, 1]) {
+    blockEye(c, {
+      x: side * 0.12, y: 1.26, z: 0.265,
+      w: 0.15, h: 0.13,
+      white: 0xfff8ec,
+      iris: side < 0 ? green : blue,
+      pupil: 0x17231f,
+      outline: 0x3a1a20,
+      frame: 0x5d1c26
+    });
+    part(c, 0x5d1c26, side * 0.12, 1.36, 0.283, 0.19, 0.015, 0.012);
+    part(c, 0x5d1c26, side * 0.2, 1.335, 0.275, 0.06, 0.012, 0.01, side * 0.2);
+    part(c, 0xf2a7a1, side * 0.19, 1.17, 0.278, 0.075, 0.025, 0.01);
+  }
+  part(c, skinWarm, 0, 1.19, 0.285, 0.028, 0.018, 0.01);
+  part(c, 0xb95556, 0, 1.15, 0.29, 0.075, 0.018, 0.01);
+  part(c, 0xb95556, 0, 1.145, 0.292, 0.04, 0.012, 0.008);
+
+  // Fluffy red cat tail curling up behind the shorts.
+  const tail: Array<[number, number, number, number, number]> = [
+    [0.34, 0.62, -0.32, 0.14, 0.14],
+    [0.43, 0.68, -0.36, 0.15, 0.14],
+    [0.48, 0.78, -0.38, 0.17, 0.13],
+    [0.47, 0.9, -0.39, 0.18, 0.12],
+    [0.4, 1.01, -0.39, 0.17, 0.11],
+    [0.32, 1.09, -0.38, 0.14, 0.1],
+    [0.26, 1.15, -0.36, 0.11, 0.09]
+  ];
+  for (const [x, y, z, sx, sy] of tail) {
+    part(c, hair, x, y, z, sx, sy, 0.1);
+    part(c, hairDark, x + 0.02, y + 0.01, z - 0.045, sx * 0.65, sy * 0.7, 0.03);
+  }
+  part(c, 0xfff8ef, 0.26, 1.15, -0.36, 0.1, 0.06, 0.1);
+
+  return c;
+}
 

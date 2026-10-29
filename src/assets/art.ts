@@ -13,6 +13,7 @@ import { AMELIA_ART } from "./portraits/ameliaArt";
 import { NYAMURAS_ART } from "./portraits/nyamurasArt";
 import { KNJAZEVDESU_ART } from "./portraits/knjazevdesuArt";
 import { SEVERINA_ART } from "./portraits/severinaArt";
+import { LILANEI_ART } from "./portraits/lilaneiArt";
 
 export const GENERATED_ART: Partial<Record<SkinId, string>> = {
   ditoshey: DITOSHEY_ART,
@@ -29,6 +30,7 @@ export const GENERATED_ART: Partial<Record<SkinId, string>> = {
   amelia: AMELIA_ART,
   nyamuras: NYAMURAS_ART,
   knjazevdesu: KNJAZEVDESU_ART,
+  lilanei: LILANEI_ART,
 };
 
 export interface ArtHeadCrop { x: number; y: number; w: number; }
@@ -49,5 +51,6 @@ export const ART_HEAD_CROPS: Record<SkinId, ArtHeadCrop> = {
   amelia: { x: 0.2, y: 0.02, w: 0.58 },
   nyamuras: { x: 0.18, y: 0.02, w: 0.62 },
   knjazevdesu: { x: 0.18, y: 0.02, w: 0.62 },
+  lilanei: { x: 0, y: 0, w: 1 },
 };
 

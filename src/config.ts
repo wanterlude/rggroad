@@ -1,7 +1,7 @@
-export type SkinId = "moryaka" | "severina" | "higanbanban" | "ditoshey" | "squimeh" | "snezha" | "meowlody" | "miliray" | "yuchii" | "alaskanyan" | "alysque" | "amelia" | "nyamuras" | "knjazevdesu";
+export type SkinId = "moryaka" | "severina" | "higanbanban" | "ditoshey" | "squimeh" | "snezha" | "meowlody" | "miliray" | "yuchii" | "alaskanyan" | "alysque" | "amelia" | "nyamuras" | "knjazevdesu" | "lilanei";
 
 // Keep the legacy style names so the old, unused voxel builders still type-check.
-export type SkinStyle = "chicken" | "penguin" | "frog" | "unicorn" | "moryaka" | "severina" | "higanbanban" | "ditoshey" | "squimeh" | "snezha" | "meowlody" | "miliray" | "yuchii" | "alaskanyan" | "alysque" | "amelia" | "nyamuras" | "knjazevdesu";
+export type SkinStyle = "chicken" | "penguin" | "frog" | "unicorn" | "moryaka" | "severina" | "higanbanban" | "ditoshey" | "squimeh" | "snezha" | "meowlody" | "miliray" | "yuchii" | "alaskanyan" | "alysque" | "amelia" | "nyamuras" | "knjazevdesu" | "lilanei";
 
 export interface SkinDef {
   id: SkinId;
@@ -216,6 +216,25 @@ export const SKINS: Record<SkinId, SkinDef> = {
     mane: 0x2fbfae,
     horn: 0xd8efb6
   },
+  lilanei: {
+    id: "lilanei",
+    name: "lilanei",
+    cost: 10,
+    style: "lilanei",
+    badge: "Летняя кошка",
+    body: 0xffe6d8,
+    bodyShade: 0xf0cbb8,
+    belly: 0xfff8ef,
+    wing: 0x0e6f8c,
+    comb: 0xb51f2e,
+    beak: 0xf6b3a5,
+    feet: 0xf6f2ea,
+    eye: 0x4fa85e,
+    pupil: 0x1f2a24,
+    accent: 0xf6f2ea,
+    mane: 0xb51f2e,
+    horn: 0x8ed8e8
+  },
   moryaka: {
     id: "moryaka",
     name: "itsMORIKO",
@@ -294,7 +313,7 @@ export const SKINS: Record<SkinId, SkinDef> = {
   }
 };
 
-export const SKIN_ORDER: SkinId[] = ["moryaka", "severina", "higanbanban", "ditoshey", "squimeh", "snezha", "meowlody", "miliray", "yuchii", "alaskanyan", "alysque", "amelia", "nyamuras", "knjazevdesu"];
+export const SKIN_ORDER: SkinId[] = ["moryaka", "severina", "higanbanban", "ditoshey", "squimeh", "snezha", "meowlody", "miliray", "yuchii", "alaskanyan", "alysque", "amelia", "nyamuras", "knjazevdesu", "lilanei"];
 
 export const PALETTE = {
   grass: [0x7cd35b, 0x73ca52, 0x82d763, 0x6fc54e],

@@ -344,6 +344,9 @@ export class Game {
   };
 
   private onKeyDown = (event: KeyboardEvent): void => {
+    // Typing a nickname must never toggle sound, pause the game or move the
+    // hero. The nickname dialog handles its own Escape/Enter.
+    if (this.ui.isTextEntryActive()) return;
     const code = event.code;
     if (code === "KeyM") {
       event.preventDefault();

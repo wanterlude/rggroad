@@ -767,6 +767,16 @@ export class UI {
     return !!active && ["BUTTON", "A", "INPUT"].includes(active.tagName);
   }
 
+  /** True while the nickname dialog is open or a visible text field has focus. */
+  isTextEntryActive(): boolean {
+    if (!this.refs.nicknameModal.classList.contains("hidden")) return true;
+    const active = document.activeElement;
+    return (
+      (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) &&
+      active.getClientRects().length > 0
+    );
+  }
+
   clearFocus(): void {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   }
