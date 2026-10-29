@@ -21,6 +21,7 @@
             <span class="score-caption">СЧЁТ</span>
             <strong id="scoreValue">0</strong>
             <span class="best-inline">РЕКОРД <b id="bestValue">0</b></span>
+            <span id="recordGap" class="record-gap" aria-live="polite">ПЕРВЫЙ РЕКОРД</span>
           </div>
           <div id="newBestBadge" class="new-best hidden">НОВЫЙ РЕКОРД!</div>
         </div>
@@ -60,6 +61,14 @@
       </div>
 
       <div id="biomeFade" class="biome-fade" aria-hidden="true"></div>
+
+      <div id="milestone" class="milestone" role="status" aria-live="polite">
+        <div class="milestone-medal" aria-hidden="true">★</div>
+        <div class="milestone-copy">
+          <strong id="milestoneValue">50</strong>
+          <span>РЯДОВ</span>
+        </div>
+      </div>
 
       <!-- Main menu -->
       <section id="menu" class="screen menu-screen" aria-label="Главное меню">
@@ -161,6 +170,11 @@
             <span class="coin-icon" aria-hidden="true"></span>
             <span>Собрано за забег</span>
             <strong id="runCoins">0</strong>
+          </div>
+
+          <div class="run-biomes">
+            <span>Биомов пройдено</span>
+            <strong id="runBiomes">1</strong>
           </div>
 
           <div class="modal-actions">

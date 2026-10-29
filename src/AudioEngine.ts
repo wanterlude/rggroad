@@ -255,6 +255,20 @@ export class AudioEngine {
     this.tone({ frequency: 220, endFrequency: 80, duration: 0.6, type: "sine", volume: 0.045, delay: 0.1 });
   }
 
+  milestone(): void {
+    [523, 659, 784, 1047].forEach((frequency, index) => {
+      this.tone({ frequency, duration: 0.16, type: "triangle", volume: 0.055, delay: index * 0.07 });
+    });
+    this.noise({
+      duration: 0.25,
+      volume: 0.02,
+      filterType: "highpass",
+      frequency: 3200,
+      endFrequency: 6400,
+      delay: 0.05
+    });
+  }
+
   newBest(): void {
     [523, 659, 784, 1047].forEach((frequency, index) => {
       this.tone({ frequency, duration: 0.22, type: "triangle", volume: 0.055, delay: index * 0.09 });

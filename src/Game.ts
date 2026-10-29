@@ -54,6 +54,8 @@ export class Game {
   private isoOverride: IsoCameraOverride | null = null;
   private readonly boot: GameBootOptions;
   private debugRun = false;
+  private readonly biomesVisited = new Set<string>();
+  private runMilestone = 0;
 
   constructor(canvas: HTMLCanvasElement, boot: GameBootOptions = {}) {
     this.boot = boot;
@@ -130,6 +132,9 @@ export class Game {
     this.lastBiomeBoundary = this.world.getNextBiomeBoundary();
     this.lastBiomeId = this.world.getBiome().id;
     this.score = this.world.getScore();
+    this.biomesVisited.clear();
+    this.biomesVisited.add(this.lastBiomeId);
+    this.runMilestone = Math.floor(this.score / 50);
     this.startingBest = save.data.best;
     this.newBestShown = false;
     this.deathTimer = 0;
@@ -388,6 +393,12 @@ export class Game {
       } else if (event.type === "score") {
         this.score = event.score;
         this.ui.updateHUD(this.score, true);
+        const milestone = Math.floor(this.score / 50);
+        if (milestone > this.runMilestone) {
+          this.runMilestone = milestone;
+          this.ui.showMilestone(milestone * 50);
+          this.audio.milestone();
+        }
         if (!this.debugRun && this.score > save.data.best) {
           save.data.best = this.score;
           save.write();
@@ -466,6 +477,7 @@ export class Game {
       score: this.deathData.score,
       best: save.data.best,
       runCoins: this.deathData.coins,
+      biomes: this.biomesVisited.size,
       isRecord
     });
   }
@@ -567,6 +579,7 @@ export class Game {
       const biomeId = this.world.getBiome().id;
       if (biomeId !== this.lastBiomeId) {
         this.lastBiomeId = biomeId;
+        this.biomesVisited.add(biomeId);
         this.ui.fadeBiomeTransition();
         this.announceBiome();
       }

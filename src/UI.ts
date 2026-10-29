@@ -33,6 +33,10 @@ export class UI {
     scorePill: document.querySelector(".score-pill") as HTMLElement,
     coinPill: document.querySelector(".coin-pill") as HTMLElement,
     newBestBadge: $("newBestBadge"),
+    recordGap: $("recordGap"),
+    milestone: $("milestone"),
+    milestoneValue: $("milestoneValue"),
+    runBiomes: $("runBiomes"),
     tutorial: $("tutorial"),
     eagleWarning: $("eagleWarning"),
     eagleCountdown: $("eagleCountdown"),
@@ -79,6 +83,7 @@ export class UI {
   private toastTimer = 0;
   private newBestTimer = 0;
   private biomeBannerTimer = 0;
+  private milestoneTimer = 0;
   private wheelAccum = 0;
   private wheelIdleTimer = 0;
   private wheelIndex = -1;
@@ -217,6 +222,7 @@ export class UI {
     this.setHidden(this.refs.newBestRibbon, true);
     this.hideTutorial();
     this.hideBiomeBanner();
+    this.hideMilestone();
     this.setWeather(false);
     this.updateStats();
     this.renderSkinCards();
@@ -262,6 +268,24 @@ export class UI {
     this.refs.weather.classList.toggle("is-storm", storm);
   }
 
+  /** A 50-row milestone badge. */
+  showMilestone(score: number): void {
+    this.refs.milestoneValue.textContent = String(score);
+    this.refs.milestone.classList.remove("is-visible");
+    void this.refs.milestone.offsetWidth;
+    this.refs.milestone.classList.add("is-visible");
+    window.clearTimeout(this.milestoneTimer);
+    this.milestoneTimer = window.setTimeout(
+      () => this.refs.milestone.classList.remove("is-visible"),
+      2300
+    );
+  }
+
+  hideMilestone(): void {
+    window.clearTimeout(this.milestoneTimer);
+    this.refs.milestone.classList.remove("is-visible");
+  }
+
   showPlaying(): void {
     this.setHidden(this.refs.menu, true);
     this.setHidden(this.refs.hud, false);
@@ -271,12 +295,14 @@ export class UI {
     this.setHidden(this.refs.newBestBadge, true);
     this.setHidden(this.refs.newBestRibbon, true);
     this.resetTutorial();
+    this.hideMilestone();
   }
 
   showPause(): void {
     this.setHidden(this.refs.pause, false);
     this.hideEagleWarning();
     this.hideBiomeBanner();
+    this.hideMilestone();
     this.hideTutorial();
   }
 
@@ -289,9 +315,11 @@ export class UI {
     score: number;
     best: number;
     runCoins: number;
+    biomes: number;
     isRecord: boolean;
   }): void {
     this.hideEagleWarning();
+    this.hideMilestone();
     const title =
       options.cause === "water"
         ? "БУЛЬ!"
@@ -349,6 +377,7 @@ export class UI {
     this.refs.finalScore.textContent = fmt(options.score);
     this.refs.finalBest.textContent = fmt(options.best);
     this.refs.runCoins.textContent = fmt(options.runCoins);
+    this.refs.runBiomes.textContent = fmt(options.biomes);
     this.setHidden(this.refs.newBestRibbon, !options.isRecord);
     this.setHidden(this.refs.gameover, false);
     this.setHidden(this.refs.hud, true);
@@ -360,11 +389,22 @@ export class UI {
 
   updateHUD(score: number, animateScore = false, animateCoin = false): void {
     const { refs } = this;
+    const best = Math.max(save.data.best, score);
     refs.scoreValue.textContent = fmt(score);
-    refs.bestValue.textContent = fmt(Math.max(save.data.best, score));
+    refs.bestValue.textContent = fmt(best);
     refs.coinValue.textContent = fmt(save.data.coins);
     refs.menuBest.textContent = fmt(save.data.best);
     refs.menuCoins.textContent = fmt(save.data.coins);
+    if (best <= 0) {
+      refs.recordGap.textContent = "ПЕРВЫЙ РЕКОРД";
+      refs.recordGap.classList.remove("is-record");
+    } else if (score >= best) {
+      refs.recordGap.textContent = "РЕКОРД ПОБИТ!";
+      refs.recordGap.classList.add("is-record");
+    } else {
+      refs.recordGap.textContent = `ДО РЕКОРДА ${Math.ceil(best - score)}`;
+      refs.recordGap.classList.remove("is-record");
+    }
     if (animateScore) this.pop(refs.scorePill);
     if (animateCoin) this.pop(refs.coinPill);
   }
