@@ -148,6 +148,26 @@ export interface FallerData {
   nut?: THREE.Group;
 }
 
+export interface LeafPileData {
+  x: number;
+  collected: boolean;
+  group?: THREE.Group;
+}
+
+export interface TarPitData {
+  x: number;
+  mesh?: THREE.Mesh;
+}
+
+export interface BeltData {
+  x0: number;
+  x1: number;
+  dir: 1 | -1;
+  speed: number;
+  mesh?: THREE.Mesh;
+  texture?: THREE.Texture;
+}
+
 export interface FragileTileData {
   x: number;
   kind: FragileKind;
@@ -175,6 +195,9 @@ export interface Row {
   light?: TrafficLightData;
   fragile?: FragileTileData[];
   fallers?: FallerData[];
+  leafPiles?: LeafPileData[];
+  tarPits?: TarPitData[];
+  belts?: BeltData[];
   signs: SignData[];
   train: TrainData | null;
   dir: 1 | -1;
@@ -210,6 +233,7 @@ export interface PlayerState {
   lastDx: number;
   lastDz: number;
   slide: boolean;
+  tarred: boolean;
 }
 
 export type GameEvent =

@@ -54,6 +54,12 @@ export interface BiomeMechanics {
   fragile?: "void" | "ghost";
   /** Jungle: coconuts that fall onto a cell after a growing shadow. */
   fallers?: "coconut";
+  /** Autumn: bonus leaf piles on safe rows. */
+  leafPiles?: boolean;
+  /** Prehistoric: tar pits slow the next hop. */
+  tarPits?: boolean;
+  /** Candy: conveyor belts drag the hero sideways. */
+  belts?: boolean;
 }
 
 export type BiomePropKind =
@@ -589,7 +595,7 @@ const BASE_BIOMES: Record<BaseBiomeId, BiomeDef> = {
 };
 
 const BASE_MECHANICS: Record<BaseBiomeId, BiomeMechanics> = {
-  autumn: { speed: 1, road: 0.43, river: 0.22, rail: 0.14, water: "logs", police: false, idle: "eagle", stampede: false },
+  autumn: { speed: 1, road: 0.43, river: 0.22, rail: 0.14, water: "logs", police: false, idle: "eagle", stampede: false, leafPiles: true },
   forest: { speed: 1.02, road: 0.42, river: 0.22, rail: 0.13, water: "logs", police: false, idle: "eagle", stampede: false, rollers: "log" },
   desert: { speed: 1.08, road: 0.5, river: 0.12, rail: 0.12, water: "crocodile", police: false, idle: "eagle", stampede: false, rollers: "tumbleweed" },
   ocean: { speed: 0.98, road: 0.3, river: 0.37, rail: 0.1, water: "logs", police: false, idle: "eagle", stampede: false },
@@ -799,7 +805,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
       { kind: "tuft", weight: 0.2 },
       { kind: "mushroom", weight: 0.4 }
     ],
-    mechanics: { speed: 0.98, road: 0.36, river: 0.32, rail: 0.1, water: "chocolate", police: false, idle: "candy-plane", stampede: false }
+    mechanics: { speed: 0.98, road: 0.36, river: 0.32, rail: 0.1, water: "chocolate", police: false, idle: "candy-plane", stampede: false, belts: true }
   }),
   prehistoric: variant("prehistoric", "ДОИСТОРИЯ", "forest", {
     grass: [0x78a04a, 0x6f9443, 0x83ac53],
@@ -831,7 +837,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
       { kind: "tuft", weight: 0.3 },
       { kind: "pebble", weight: 0.3 }
     ],
-    mechanics: { speed: 1.18, road: 0.4, river: 0.3, rail: 0.11, water: "crocodile", police: false, idle: "pterodactyl", stampede: true }
+    mechanics: { speed: 1.18, road: 0.4, river: 0.3, rail: 0.11, water: "crocodile", police: false, idle: "pterodactyl", stampede: true, tarPits: true }
   }),
   halloween: variant("halloween", "ХЭЛЛОУИН", "forest", {
     grass: [0x58495a, 0x4f4252, 0x625164],
@@ -1079,7 +1085,7 @@ export function biomeForZ(z: number): BiomeDef {
 }
 
 export const BIOME_DESCRIPTIONS: Record<BiomeId, string> = {
-  autumn: "Спокойный старт: знакомый трафик, брёвна и орёл. Разомнись — дальше будет разнообразнее.",
+  autumn: "Листопады: кучи листьев дают бонусные монеты. Безопасно — собирай.",
   forest: "По лужайкам катятся брёвна. Пережди, пока бревно пройдёт, или обойди его.",
   desert: "Перекати-поле катится через лужайки. Не стой на его пути.",
   ocean: "Много рек: прыгай по брёвнам и не дай унести себя.",
@@ -1090,8 +1096,8 @@ export const BIOME_DESCRIPTIONS: Record<BiomeId, string> = {
   jungle: "С деревьев падают кокосы: тень растёт — уходи с клетки.",
   city: "Светофоры: на красный машины стоят. Переходи, когда поток замер.",
   space: "Низкая гравитация: прыжок дольше и выше. Держи ритм и рассчитывай траекторию.",
-  candy: "Шоколадные реки и конфетный самолёт. Сладко и опасно.",
-  prehistoric: "Стампида вместо поездов и птеродактиль. Слушай гул земли.",
+  candy: "Шоколадные реки, конвейеры и конфетный самолёт. Ленты сами двигают героя.",
+  prehistoric: "Смоляные ямы замедляют следующий прыжок. Обходи или перетерпи.",
   halloween: "Призрачные плиты мерцают и исчезают. Не задерживайся на них.",
   storm: "Гроза: дождь, сумрак и ускоренный трафик. Держи ритм, не зевай.",
   flood: "Половодье: вместо лужаек вода. Отдых только на островках.",

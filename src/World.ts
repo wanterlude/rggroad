@@ -29,6 +29,7 @@ import {
 } from "./biomes";
 import type {
   CarData,
+  BeltData,
   CoinData,
   DeathCause,
   FallerData,
@@ -36,6 +37,7 @@ import type {
   FragileTileData,
   GameEvent,
   GeyserData,
+  LeafPileData,
   LogData,
   PlayerState,
   PropData,
@@ -44,6 +46,7 @@ import type {
   Row,
   RowType,
   SignData,
+  TarPitData,
   TrainData
 } from "./types";
 import {
@@ -116,6 +119,33 @@ const fallerShadowMaterial = new THREE.MeshBasicMaterial({
   opacity: 0.32,
   depthWrite: false
 });
+const tarPitGeometry = new THREE.CircleGeometry(0.44, 20);
+const tarRingGeometry = new THREE.RingGeometry(0.44, 0.52, 20);
+const tarBubbleGeometry = new THREE.SphereGeometry(0.06, 6, 4);
+const leafCubeGeometry = new THREE.BoxGeometry(0.15, 0.06, 0.13);
+const leafMaterials = new Map<number, THREE.MeshLambertMaterial>();
+const beltBaseTexture = (() => {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#ffd1e0";
+  ctx.fillRect(0, 0, size, size);
+  for (let x = 0; x < size; x += 16) {
+    ctx.fillStyle = "#ff7ea6";
+    ctx.fillRect(x, 0, 8, size);
+    ctx.fillStyle = "#fff7e2";
+    ctx.fillRect(x + 8, 0, 8, size);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  return texture;
+})();
 const lampGeometry = new THREE.CircleGeometry(0.115, 14);
 const lightHousingGeometry = new THREE.BoxGeometry(0.46, 1.05, 0.28);
 const lightPoleGeometry = new THREE.CylinderGeometry(0.055, 0.055, 3.4, 8);
@@ -227,7 +257,8 @@ export class World {
       idlePhase: this.rng() * Math.PI * 2,
       lastDx: 0,
       lastDz: 1,
-      slide: false
+      slide: false,
+      tarred: false
     };
 
     for (let z = -38; z <= 2; z++) {
@@ -453,6 +484,9 @@ export class World {
 
     for (const fragile of row.fragile ?? []) this.buildFragileTile(fragile, row);
     for (const faller of row.fallers ?? []) this.buildFaller(faller, row);
+    for (const pile of row.leafPiles ?? []) this.buildLeafPile(pile, row);
+    for (const pit of row.tarPits ?? []) this.buildTarPit(pit, row);
+    for (const belt of row.belts ?? []) this.buildBelt(belt, row);
 
     if (row.light) this.buildTrafficLight(row);
 
@@ -643,11 +677,12 @@ export class World {
     row.variant = Math.floor(this.rng() * 4);
     this.addDecor(row);
     const mechanics = this.mechanicsAt(z);
-    // Keep roller rows free of solid props: a log or tumbleweed crosses the
-    // whole lawn, and rolling through a tree trunk looks broken.
+    // Keep roller and conveyor rows free of solid props: the hazard crosses
+    // the whole lawn, and clipping through a tree trunk looks broken.
     const rollerKind =
       mechanics.rollers && this.mode !== "menu" && this.rng() < 0.36 ? mechanics.rollers : null;
-    if (options.allowProps && !rollerKind) this.addProps(row);
+    const belt = mechanics.belts && this.mode !== "menu" && this.rng() < 0.45;
+    if (options.allowProps && !rollerKind && !belt) this.addProps(row);
     if (mechanics.geysers && this.mode !== "menu" && this.rng() < 0.78) {
       this.addGeysers(row);
     }
@@ -658,8 +693,69 @@ export class World {
     if (mechanics.fallers && this.mode !== "menu" && this.rng() < 0.48) {
       this.addFaller(row);
     }
+    if (mechanics.leafPiles && this.mode !== "menu" && this.rng() < 0.55) {
+      this.addLeafPiles(row);
+    }
+    if (mechanics.tarPits && this.mode !== "menu" && this.rng() < 0.6) {
+      this.addTarPit(row);
+    }
+    if (belt) this.addBelt(row);
     if (options.allowCoin) this.addCoin(row, 0.4, -3.8, 3.8);
     return row;
+  }
+
+  private addLeafPiles(row: Row): void {
+    const count = this.rng() < 0.6 ? 1 : 2;
+    const lane = [-3, -2, -1, 0, 1, 2, 3];
+    this.shuffleLane(lane);
+    const piles: LeafPileData[] = [];
+    for (const x of lane) {
+      if (piles.length >= count) break;
+      if (row.props.some((prop) => prop.collider && Math.abs(prop.x - x) < prop.radius + 0.55)) continue;
+      if ((row.geysers ?? []).some((geyser) => Math.abs(geyser.x - x) < 0.8)) continue;
+      if ((row.fallers ?? []).some((faller) => Math.abs(faller.x - x) < 0.8)) continue;
+      if ((row.fragile ?? []).some((tile) => Math.abs(tile.x - x) < 0.8)) continue;
+      piles.push({ x, collected: false });
+    }
+    if (piles.length > 0) row.leafPiles = piles;
+  }
+
+  private addTarPit(row: Row): void {
+    const count = this.rng() < 0.65 ? 1 : 2;
+    const lane = [-3, -2, -1, 0, 1, 2, 3];
+    this.shuffleLane(lane);
+    const pits: TarPitData[] = [];
+    for (const x of lane) {
+      if (pits.length >= count) break;
+      if (row.props.some((prop) => prop.collider && Math.abs(prop.x - x) < prop.radius + 0.55)) continue;
+      if ((row.geysers ?? []).some((geyser) => Math.abs(geyser.x - x) < 0.8)) continue;
+      if ((row.leafPiles ?? []).some((pile) => Math.abs(pile.x - x) < 0.8)) continue;
+      pits.push({ x });
+    }
+    if (pits.length > 0) row.tarPits = pits;
+  }
+
+  private addBelt(row: Row): void {
+    const dir: 1 | -1 = this.rng() < 0.5 ? 1 : -1;
+    const len = 3 + Math.floor(this.rng() * 3);
+    const start = -Math.floor(len / 2);
+    row.belts = [
+      {
+        x0: start,
+        x1: start + len - 1,
+        dir,
+        speed: rr(this.rng, 1.1, 1.9)
+      }
+    ];
+  }
+
+  private shuffleLane(lane: number[]): void {
+    for (let i = lane.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      const swap = lane[i];
+      lane[i] = lane[j];
+      lane[j] = swap;
+    }
   }
 
   /** Jungle: a coconut drops onto a cell after its shadow has grown. */
@@ -865,6 +961,8 @@ export class World {
       if (row.geysers?.some((g) => Math.abs(g.x - x) < 0.75)) continue;
       if (row.fragile?.some((tile) => Math.abs(tile.x - x) < 0.75)) continue;
       if (row.fallers?.some((faller) => Math.abs(faller.x - x) < 0.75)) continue;
+      if (row.leafPiles?.some((pile) => Math.abs(pile.x - x) < 0.75)) continue;
+      if (row.tarPits?.some((pit) => Math.abs(pit.x - x) < 0.75)) continue;
       row.coin = {
         x,
         z: row.z,
@@ -1033,15 +1131,18 @@ export class World {
     this.ensureRowsAround(this.player.z);
     this.updateLights(time);
     this.updateTraffic(dt);
+    this.updateBelts(dt);
     if ((this.mode === "demo" || (this.mode === "run" && this.botEnabled)) && !this.player.dead) {
       this.updateDemoBot(dt);
     }
+    this.applyBelts(dt);
     this.updatePlayer(dt, time);
     this.updateGeysers(dt, time);
     this.updateFragile(dt, time);
     this.updateFallers(dt, time);
     this.updateIdleHazard(dt);
     this.updateCoins(time);
+    this.updateLeafPiles();
     this.updateRowVisibility();
     this.shake = damp(this.shake, 0, 5.5, dt);
 
@@ -1211,6 +1312,83 @@ export class World {
     fragile.hole = hole;
   }
 
+  private buildLeafPile(pile: LeafPileData, row: Row): void {
+    const group = new THREE.Group();
+    group.position.set(pile.x, 0, 0);
+    const colors = [0xff8a3d, 0xffd23f, 0xd96a2b, 0x8a5a2b, 0xffb35c];
+    for (let i = 0; i < 9; i++) {
+      const color = colors[i % colors.length];
+      let material = leafMaterials.get(color);
+      if (!material) {
+        material = new THREE.MeshLambertMaterial({ color });
+        leafMaterials.set(color, material);
+      }
+      const leaf = new THREE.Mesh(leafCubeGeometry, material);
+      leaf.position.set((Math.random() - 0.5) * 0.52, 0.04 + Math.random() * 0.14, (Math.random() - 0.5) * 0.46);
+      leaf.rotation.y = Math.random() * Math.PI;
+      leaf.rotation.z = (Math.random() - 0.5) * 0.5;
+      group.add(leaf);
+    }
+    row.group.add(group);
+    pile.group = group;
+  }
+
+  private buildTarPit(pit: TarPitData, row: Row): void {
+    const mesh = new THREE.Mesh(
+      tarPitGeometry,
+      new THREE.MeshBasicMaterial({ color: 0x120d09 })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(pit.x, 0.028, 0);
+    mesh.scale.set(1.15, 0.8, 1);
+    const rim = new THREE.Mesh(
+      tarRingGeometry,
+      new THREE.MeshBasicMaterial({ color: 0x4a3320 })
+    );
+    rim.rotation.x = -Math.PI / 2;
+    rim.position.set(pit.x, 0.03, 0);
+    rim.scale.set(1.15, 0.8, 1);
+    row.group.add(mesh, rim);
+    for (let i = 0; i < 3; i++) {
+      const bubble = new THREE.Mesh(
+        tarBubbleGeometry,
+        new THREE.MeshLambertMaterial({ color: 0x2a1c12 })
+      );
+      bubble.position.set(
+        pit.x + (Math.random() - 0.5) * 0.5,
+        0.045,
+        (Math.random() - 0.5) * 0.3
+      );
+      row.group.add(bubble);
+    }
+    pit.mesh = mesh;
+  }
+
+  private buildBelt(belt: BeltData, row: Row): void {
+    const width = belt.x1 - belt.x0 + 1;
+    const texture = beltBaseTexture.clone();
+    texture.needsUpdate = true;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.repeat.set(width / 1.1, 1);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(width, 0.9),
+      new THREE.MeshBasicMaterial({ map: texture })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set((belt.x0 + belt.x1) / 2, 0.04, 0);
+    row.group.add(mesh);
+    const rollerGeometry = new THREE.CylinderGeometry(0.11, 0.11, 0.9, 10);
+    const rollerMaterial = new THREE.MeshLambertMaterial({ color: 0xffb6cf });
+    for (const x of [belt.x0 - 0.45, belt.x1 + 0.45]) {
+      const roller = new THREE.Mesh(rollerGeometry, rollerMaterial);
+      roller.rotation.x = Math.PI / 2;
+      roller.position.set(x, 0.11, 0);
+      row.group.add(roller);
+    }
+    belt.mesh = mesh;
+    belt.texture = texture;
+  }
+
   private buildFaller(faller: FallerData, row: Row): void {
     const shadow = new THREE.Mesh(fallerShadowGeometry, fallerShadowMaterial);
     shadow.rotation.x = -Math.PI / 2;
@@ -1317,6 +1495,60 @@ export class World {
         } else if (local < warnEnd && faller.shadow) {
           faller.shadow.scale.setScalar(0.55 + (local / warnEnd) * 0.45);
         }
+      }
+    }
+  }
+
+  private updateLeafPiles(): void {
+    if (this.mode === "menu" || this.player.dead) return;
+    const p = this.player;
+    if (p.hopping) return;
+    const row = this.rows.get(Math.round(p.z));
+    if (!row?.leafPiles) return;
+    for (const pile of row.leafPiles) {
+      if (pile.collected) continue;
+      if (Math.abs(p.x - pile.x) > 0.55) continue;
+      pile.collected = true;
+      if (pile.group) pile.group.visible = false;
+      this.runCoins += 2;
+      p.runCoins += 2;
+      this.events.push({ type: "coin", amount: 2, total: this.runCoins });
+      this.sceneView.particles.burstCoin(pile.x, row.z, 3);
+      for (let i = 0; i < 8; i++) {
+        this.sceneView.particles.spawn({
+          x: pile.x + (Math.random() - 0.5) * 0.4,
+          y: 0.25,
+          z: row.z + (Math.random() - 0.5) * 0.4,
+          vx: (Math.random() - 0.5) * 1.2,
+          vy: 0.8 + Math.random() * 1.2,
+          vz: (Math.random() - 0.5) * 1.2,
+          gravity: 2.4,
+          life: 0.5 + Math.random() * 0.4,
+          size: 0.05 + Math.random() * 0.04,
+          color: [0xff8a3d, 0xffd23f, 0xd96a2b][i % 3],
+          spin: 7
+        });
+      }
+    }
+  }
+
+  private applyBelts(dt: number): void {
+    const p = this.player;
+    if (this.mode === "menu" || p.dead || p.hopping) return;
+    const row = this.rows.get(Math.round(p.z));
+    if (!row?.belts) return;
+    for (const belt of row.belts) {
+      if (p.x < belt.x0 - 0.5 || p.x > belt.x1 + 0.5) continue;
+      p.x = clamp(p.x + belt.dir * belt.speed * dt, belt.x0 - 0.5, belt.x1 + 0.5);
+    }
+  }
+
+  private updateBelts(dt: number): void {
+    const p = this.player;
+    for (const row of this.rows.values()) {
+      if (!row.belts || Math.abs(row.z - p.z) > 20) continue;
+      for (const belt of row.belts) {
+        if (belt.texture) belt.texture.offset.x -= belt.dir * belt.speed * dt * 0.55;
       }
     }
   }
@@ -1600,7 +1832,7 @@ export class World {
       const mechanics = this.mechanicsAt(p.z);
       const gravity = mechanics.gravity ?? 1;
       // Low gravity stretches the arc; a slide is a fast, low glide.
-      const duration = HOP_DURATION * gravity * (p.slide ? 1.6 : 1);
+      const duration = HOP_DURATION * gravity * (p.slide ? 1.6 : 1) * (p.tarred ? 1.75 : 1);
       p.hopT += dt / duration;
       const t = clamp(p.hopT, 0, 1);
       const eased = t * t * (3 - 2 * t);
@@ -1758,6 +1990,7 @@ export class World {
     p.targetYaw = Math.atan2(dx, dz) + 0.14;
     p.squash = 0.82;
     p.queued = null;
+    if (p.tarred) this.sceneView.particles.burstDust(p.x, p.z, 5, 0x3a2a1e);
     if (this.mode === "run") {
       this.idleTime = 0;
       this.clearEagleWarning();
@@ -1784,6 +2017,10 @@ export class World {
       row = this.makeGrassRow(Math.round(p.z), { allowProps: false, allowCoin: false });
       this.attachRow(row);
     }
+
+    p.tarred =
+      row.type === "grass" && (row.tarPits ?? []).some((pit) => Math.abs(pit.x - p.x) < 0.5);
+    if (p.tarred) this.sceneView.particles.burstDust(p.x, p.z, 6, 0x3a2a1e);
 
     if (row.type === "water") {
       const log = this.findLog(row, p.x);
