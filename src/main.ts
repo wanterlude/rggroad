@@ -52,6 +52,9 @@ try {
   const biome =
     biomeRaw !== null && knownBiomes.includes(biomeRaw) ? (biomeRaw as BiomeId) : undefined;
   const season = parseSeason(query.get("season")) ?? undefined;
+  const lbOverride = query.get("lb");
+  const local = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost";
+  const leaderboardUrl = local && lbOverride ? lbOverride : undefined;
   const game = new Game(canvas, {
     seed,
     row,
@@ -59,7 +62,8 @@ try {
     bot: query.get("bot") === "1",
     autostart: query.get("start") === "1" || query.get("autoplay") === "1",
     noAutostart: query.get("nostart") === "1",
-    season
+    season,
+    leaderboardUrl
   });
   const debug = query.get("debug") === "1";
   game.setDebug(debug);
@@ -85,6 +89,9 @@ try {
     },
     get season() {
       return game.getSeason();
+    },
+    get leaderboard() {
+      return game.getLeaderboard();
     },
     get sceneView() {
       return game.getSceneView();

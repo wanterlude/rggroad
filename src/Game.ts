@@ -5,6 +5,7 @@ import { SceneView } from "./SceneView";
 import { World } from "./World";
 import { AudioEngine } from "./AudioEngine";
 import { UI } from "./UI";
+import { Leaderboard } from "./Leaderboard";
 import { save } from "./save";
 import { currentSeason, loadSeasonOverride, nextSeason, storeSeasonOverride, type SeasonId } from "./season";
 import type { GameEvent, GameState } from "./types";
@@ -21,6 +22,8 @@ export interface GameBootOptions {
   /** Suppress the biome-lab auto-start so a harness can drive runs itself. */
   noAutostart?: boolean;
   season?: SeasonId;
+  /** Local QA override for the Firebase Realtime Database URL. */
+  leaderboardUrl?: string;
 }
 
 interface IsoCameraOverride {
@@ -37,6 +40,7 @@ export class Game {
   private readonly sceneView: SceneView;
   private readonly audio = new AudioEngine();
   private readonly ui: UI;
+  private readonly leaderboard: Leaderboard;
   private world: World;
   private state: GameState = "menu";
   private gameTime = 0;
@@ -73,6 +77,9 @@ export class Game {
     const season = boot.season ?? loadSeasonOverride() ?? currentSeason();
     this.season = season;
     this.sceneView = new SceneView(canvas, season);
+    this.leaderboard = new Leaderboard(boot.leaderboardUrl, (state) => {
+      this.ui.renderLeaderboard(state, save.data.best);
+    });
     this.ui = new UI({
       onPlay: () => this.startRun(),
       onPause: () => this.pause(),
@@ -83,7 +90,16 @@ export class Game {
       onMusic: () => this.toggleMusic(),
       onSkin: (skin) => this.selectSkin(skin),
       onFavorite: (skin) => this.toggleFavorite(skin),
-      onSeason: () => this.cycleSeason()
+      onSeason: () => this.cycleSeason(),
+      onLeaderboardRefresh: () => this.leaderboard.refresh(),
+      onLeaderboardName: (name) => {
+        this.leaderboard.setName(name);
+        this.ui.renderLeaderboard(this.leaderboard.getState(), save.data.best);
+      },
+      onLeaderboardGuest: () => {
+        this.leaderboard.makeGuestName();
+        this.ui.renderLeaderboard(this.leaderboard.getState(), save.data.best);
+      }
     });
 
     this.world = this.createWorld(true);
@@ -97,6 +113,8 @@ export class Game {
     this.ui.updateHUD(0);
     this.updateCamera(0, 0);
     this.ui.renderSkinCards();
+    this.ui.renderLeaderboard(this.leaderboard.getState(), save.data.best);
+    this.leaderboard.refresh();
     this.lastFrame = performance.now();
     requestAnimationFrame(this.loop);
 
@@ -200,6 +218,8 @@ export class Game {
     this.ui.updateHUD(0);
     this.ui.updateStats();
     this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted);
+    this.ui.renderLeaderboard(this.leaderboard.getState(), save.data.best);
+    this.leaderboard.refresh();
     this.ui.clearFocus();
   }
 
@@ -544,6 +564,9 @@ export class Game {
       biomes: this.biomesVisited.size,
       isRecord
     });
+    if (!this.debugRun && this.deathData.score > 0) {
+      this.leaderboard.submit(this.deathData.score);
+    }
   }
 
   private updateCamera(dt: number, time: number): void {
@@ -772,6 +795,10 @@ export class Game {
 
   getUI(): UI {
     return this.ui;
+  }
+
+  getLeaderboard(): Leaderboard {
+    return this.leaderboard;
   }
 
   getSceneView(): SceneView {

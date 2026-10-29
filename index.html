@@ -90,6 +90,27 @@
           <img id="menuHeroImg" alt="" />
         </div>
 
+        <aside id="leaderboard" class="leaderboard" aria-label="Глобальный рейтинг">
+          <div class="leaderboard-head">
+            <span class="leaderboard-kicker">ГЛОБАЛЬНЫЙ РЕЙТИНГ</span>
+            <button id="leaderboardRefresh" class="leaderboard-icon" type="button" aria-label="Обновить рейтинг" title="Обновить">↻</button>
+            <button id="leaderboardClose" class="leaderboard-icon leaderboard-close" type="button" aria-label="Закрыть рейтинг">×</button>
+          </div>
+          <ol id="leaderboardList" class="leaderboard-list"></ol>
+          <div id="leaderboardStatus" class="leaderboard-status" role="status" aria-live="polite">ЗАГРУЗКА…</div>
+          <div class="leaderboard-self">
+            <span class="leaderboard-self-label">ТЫ</span>
+            <b id="leaderboardSelfName">—</b>
+            <strong id="leaderboardSelfScore">0</strong>
+          </div>
+          <button id="leaderboardNameBtn" class="leaderboard-name-btn" type="button">СМЕНИТЬ НИК</button>
+        </aside>
+        <button id="leaderboardOpen" class="leaderboard-open" type="button" aria-label="Открыть глобальный рейтинг">
+          <span class="leaderboard-open-star" aria-hidden="true">★</span>
+          <span>РЕЙТИНГ</span>
+        </button>
+        <div id="leaderboardBackdrop" class="leaderboard-backdrop" hidden></div>
+
         <div class="menu-bottom">
           <div class="skin-dock" id="skinDock">
             <div class="dock-heading">
@@ -129,6 +150,28 @@
         <div class="menu-credit" aria-label="Создатель игры: wanterlude">wanterlude</div>
         <div id="menuVersion" class="menu-version" aria-label="Версия игры">v0.2.0</div>
       </section>
+
+      <div id="nicknameModal" class="nickname-modal hidden" aria-hidden="true">
+        <div class="nickname-card" role="dialog" aria-modal="true" aria-labelledby="nicknameTitle">
+          <div class="nickname-kicker">ГЛОБАЛЬНЫЙ РЕЙТИНГ</div>
+          <h2 id="nicknameTitle" class="nickname-title">КАК ТЕБЯ ЗОВУТ?</h2>
+          <p class="nickname-copy">Ник будет виден в таблице рекордов. Его можно сменить в любой момент.</p>
+          <form id="nicknameForm" class="nickname-form" novalidate>
+            <input
+              id="nicknameInput"
+              class="nickname-input"
+              type="text"
+              maxlength="16"
+              autocomplete="nickname"
+              placeholder="ТВОЙ НИК"
+              aria-label="Никнейм"
+            />
+            <div id="nicknameError" class="nickname-error" role="alert"></div>
+            <button id="nicknameSaveBtn" class="big-button primary nickname-save" type="submit">СОХРАНИТЬ</button>
+            <button id="nicknameGuestBtn" class="nickname-guest" type="button">Играть как гость</button>
+          </form>
+        </div>
+      </div>
 
       <!-- Pause -->
       <section id="pauseScreen" class="screen modal-screen hidden" aria-label="Пауза" aria-modal="true" role="dialog">

@@ -3,6 +3,7 @@ import { drawPortrait } from "./Portraits";
 import { GENERATED_ART } from "./assets/art";
 import { save } from "./save";
 import { SEASONS, type SeasonId } from "./season";
+import { normalizeNickname, type LeaderboardState } from "./Leaderboard";
 import { fmt } from "./utils";
 import type { DeathCause } from "./types";
 import pkg from "../package.json";
@@ -18,6 +19,9 @@ interface UIHandlers {
   onSkin: (skin: SkinId) => void;
   onFavorite: (skin: SkinId) => void;
   onSeason: () => void;
+  onLeaderboardRefresh: () => void;
+  onLeaderboardName: (name: string) => void;
+  onLeaderboardGuest: () => void;
 }
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -55,6 +59,21 @@ export class UI {
     skinDock: $("skinDock"),
     skinCount: $("skinCount"),
     skinScrollHint: $("skinScrollHint"),
+    leaderboard: $("leaderboard"),
+    leaderboardList: $("leaderboardList"),
+    leaderboardStatus: $("leaderboardStatus"),
+    leaderboardSelfName: $("leaderboardSelfName"),
+    leaderboardSelfScore: $("leaderboardSelfScore"),
+    leaderboardRefresh: $<HTMLButtonElement>("leaderboardRefresh"),
+    leaderboardClose: $<HTMLButtonElement>("leaderboardClose"),
+    leaderboardOpen: $<HTMLButtonElement>("leaderboardOpen"),
+    leaderboardBackdrop: $("leaderboardBackdrop"),
+    leaderboardNameBtn: $<HTMLButtonElement>("leaderboardNameBtn"),
+    nicknameModal: $("nicknameModal"),
+    nicknameForm: $<HTMLFormElement>("nicknameForm"),
+    nicknameInput: $<HTMLInputElement>("nicknameInput"),
+    nicknameError: $("nicknameError"),
+    nicknameGuestBtn: $<HTMLButtonElement>("nicknameGuestBtn"),
     artModal: $("artModal"),
     artModalImg: $<HTMLImageElement>("artModalImg"),
     artModalTitle: $("artModalTitle"),
@@ -90,6 +109,8 @@ export class UI {
   private biomeBannerTimer = 0;
   private milestoneTimer = 0;
   private tutorialUsed = false;
+  private lastLeaderboard: LeaderboardState | null = null;
+  private nicknameForced = false;
 
   constructor(private handlers: UIHandlers) {
     const { refs } = this;
@@ -106,6 +127,19 @@ export class UI {
     refs.menuMusicBtn.addEventListener("click", () => handlers.onMusic());
     refs.pauseMusicBtn.addEventListener("click", () => handlers.onMusic());
     refs.seasonChip.addEventListener("click", () => handlers.onSeason());
+    refs.leaderboardRefresh.addEventListener("click", () => handlers.onLeaderboardRefresh());
+    refs.leaderboardClose.addEventListener("click", () => this.setLeaderboardOpen(false));
+    refs.leaderboardOpen.addEventListener("click", () => this.setLeaderboardOpen(true));
+    refs.leaderboardBackdrop.addEventListener("click", () => this.setLeaderboardOpen(false));
+    refs.leaderboardNameBtn.addEventListener("click", () => this.openNickname(false));
+    refs.nicknameForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      this.submitNickname();
+    });
+    refs.nicknameGuestBtn.addEventListener("click", () => {
+      handlers.onLeaderboardGuest();
+      this.closeNickname();
+    });
     refs.pauseSoundBtn.setAttribute("aria-pressed", "false");
     refs.pauseMusicBtn.setAttribute("aria-pressed", "false");
     window.addEventListener("resize", () => {
@@ -114,16 +148,29 @@ export class UI {
     });
     refs.skinRail.addEventListener("scroll", () => this.updateScrollHint());
     refs.artModalClose.addEventListener("click", () => this.closeArtwork());
+    refs.artModalImg.addEventListener("click", () => this.closeArtwork());
     refs.artModal.addEventListener("click", (event) => {
       if (event.target === refs.artModal) this.closeArtwork();
     });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && refs.artModal.classList.contains("is-open")) this.closeArtwork();
+      if (event.key === "Escape" && !refs.nicknameModal.classList.contains("hidden") && !this.nicknameForced) {
+        this.closeNickname();
+      }
+      if (event.key === "Escape" && refs.leaderboard.classList.contains("is-open")) {
+        this.setLeaderboardOpen(false);
+      }
     });
     document.addEventListener("pointerdown", (event) => {
       if (!refs.artModal.classList.contains("is-open")) return;
       const target = event.target as Node | null;
       if (target && refs.artModal.contains(target)) return;
+      // Clicking the same hero again must reach the card's click handler and
+      // close the artwork, instead of closing on pointerdown and reopening.
+      if (target instanceof Element) {
+        const card = target.closest<HTMLElement>(".char-card");
+        if (card && card.dataset.skin === refs.artModal.dataset.skin) return;
+      }
       this.closeArtwork();
     }, true);
 
@@ -146,6 +193,7 @@ export class UI {
     this.hideMilestone();
     this.setWeather(false);
     this.setNight(false);
+    this.setLeaderboardOpen(false);
     this.updateStats();
     this.renderSkinCards();
   }
@@ -212,6 +260,122 @@ export class UI {
     document.documentElement.dataset.season = season;
   }
 
+  /** Mobile opens the rating as a sheet; desktop keeps the top-left card. */
+  setLeaderboardOpen(open: boolean): void {
+    this.refs.leaderboard.classList.toggle("is-open", open);
+    this.refs.leaderboardBackdrop.hidden = !open;
+    this.refs.leaderboardOpen.setAttribute("aria-expanded", String(open));
+    if (open) {
+      window.setTimeout(() => {
+        this.refs.leaderboardRefresh.focus({ preventScroll: true });
+      }, 30);
+    }
+  }
+
+  /** Ask for a nickname once after the first load, or on demand from the card. */
+  askNickname(): void {
+    if (!this.lastLeaderboard || this.lastLeaderboard.playerName) return;
+    this.openNickname(true);
+  }
+
+  renderLeaderboard(state: LeaderboardState, selfBest: number): void {
+    this.lastLeaderboard = state;
+    const list = this.refs.leaderboardList;
+    list.innerHTML = "";
+    const top = state.entries.slice(0, 5);
+    if (top.length > 0) {
+      top.forEach((entry, index) => {
+        const row = document.createElement("li");
+        row.className = "leaderboard-row";
+        if (entry.id === state.playerId) row.classList.add("is-self");
+        row.dataset.rank = String(index + 1);
+        const rank = document.createElement("span");
+        rank.className = "leaderboard-rank";
+        rank.textContent = String(index + 1);
+        const name = document.createElement("span");
+        name.className = "leaderboard-name";
+        name.textContent = entry.name;
+        name.title = entry.name;
+        const score = document.createElement("span");
+        score.className = "leaderboard-score";
+        score.textContent = fmt(entry.score);
+        row.append(rank, name, score);
+        list.appendChild(row);
+      });
+    } else {
+      const empty = document.createElement("li");
+      empty.className = "leaderboard-empty";
+      empty.textContent =
+        state.status === "loading"
+          ? "ОБНОВЛЕНИЕ…"
+          : state.status === "ready"
+            ? "ПОКА НИКОГО НЕТ"
+            : "";
+      if (empty.textContent) list.appendChild(empty);
+    }
+
+    const status = this.refs.leaderboardStatus;
+    if (state.status === "unconfigured") {
+      status.textContent = "FIREBASE НЕ ПОДКЛЮЧЁН";
+      status.dataset.state = "error";
+    } else if (state.status === "offline") {
+      status.textContent = state.error ?? "НЕТ СВЯЗИ";
+      status.dataset.state = "error";
+    } else if (state.status === "loading") {
+      status.textContent = "ОБНОВЛЕНИЕ…";
+      status.dataset.state = "loading";
+    } else if (state.status === "ready") {
+      status.textContent = "ТОП-5 · ОБНОВЛЕНО";
+      status.dataset.state = "ready";
+    } else {
+      status.textContent = "";
+      status.dataset.state = "";
+    }
+
+    this.refs.leaderboardSelfName.textContent = state.playerName || "—";
+    this.refs.leaderboardSelfScore.textContent = fmt(Math.max(0, selfBest));
+    this.refs.leaderboardNameBtn.textContent = state.playerName ? "СМЕНИТЬ НИК" : "ЗАДАТЬ НИК";
+    if (this.refs.nicknameModal.classList.contains("hidden") && !state.playerName) {
+      this.askNickname();
+    }
+  }
+
+  private openNickname(force: boolean): void {
+    const current = this.lastLeaderboard?.playerName ?? "";
+    this.nicknameForced = force && !current;
+    this.refs.nicknameInput.value = current;
+    this.refs.nicknameError.textContent = "";
+    this.refs.nicknameModal.classList.remove("hidden");
+    this.refs.nicknameModal.setAttribute("aria-hidden", "false");
+    window.setTimeout(() => {
+      this.refs.nicknameInput.focus({ preventScroll: true });
+      this.refs.nicknameInput.select();
+    }, 40);
+  }
+
+  private closeNickname(force = false): void {
+    if (this.nicknameForced && !force) return;
+    this.nicknameForced = false;
+    this.refs.nicknameModal.classList.add("hidden");
+    this.refs.nicknameModal.setAttribute("aria-hidden", "true");
+    this.refs.nicknameError.textContent = "";
+  }
+
+  private submitNickname(): void {
+    const raw = this.refs.nicknameInput.value;
+    const name = normalizeNickname(raw);
+    if (!name) {
+      this.refs.nicknameError.textContent =
+        raw.trim().length < 2
+          ? "Минимум 2 символа"
+          : "Можно буквы, цифры, пробел, _ и - (до 16)";
+      this.refs.nicknameInput.focus();
+      return;
+    }
+    this.handlers.onLeaderboardName(name);
+    this.closeNickname(true);
+  }
+
   /** A 50-row milestone badge. */
   showMilestone(score: number): void {
     this.refs.milestoneValue.textContent = String(score);
@@ -238,6 +402,8 @@ export class UI {
     this.setHidden(this.refs.gameover, true);
     this.setHidden(this.refs.newBestBadge, true);
     this.setHidden(this.refs.newBestRibbon, true);
+    this.closeNickname(true);
+    this.setLeaderboardOpen(false);
     this.resetTutorial();
     this.hideMilestone();
   }
@@ -502,7 +668,13 @@ export class UI {
 
       main.addEventListener("click", () => {
         this.handlers.onSkin(key);
-        if (GENERATED_ART[key]) this.openArtwork(key);
+        if (!GENERATED_ART[key]) return;
+        const modal = this.refs.artModal;
+        if (modal.classList.contains("is-open") && modal.dataset.skin === key) {
+          this.closeArtwork();
+        } else {
+          this.openArtwork(key);
+        }
       });
       card.appendChild(main);
 
@@ -563,6 +735,7 @@ export class UI {
     artModalImg.src = art;
     artModalImg.alt = SKINS[key].name;
     artModalTitle.textContent = SKINS[key].name;
+    artModal.dataset.skin = key;
     artModal.classList.add("is-open");
     artModal.setAttribute("aria-hidden", "false");
     this.positionArtworkCard();
@@ -585,6 +758,7 @@ export class UI {
     const { artModal, artModalImg } = this.refs;
     artModal.classList.remove("is-open");
     artModal.setAttribute("aria-hidden", "true");
+    delete artModal.dataset.skin;
     artModalImg.src = "";
   }
 

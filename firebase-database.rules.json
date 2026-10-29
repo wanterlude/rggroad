@@ -1,0 +1,12 @@
+{
+  "rules": {
+    "leaderboard": {
+      ".read": true,
+      ".indexOn": ["score"],
+      "$playerId": {
+        ".write": true,
+        ".validate": "newData.hasChildren(['name', 'score', 'ts']) && newData.child('name').isString() && newData.child('name').val().length <= 16 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 1000000 && newData.child('ts').isNumber()"
+      }
+    }
+  }
+}
