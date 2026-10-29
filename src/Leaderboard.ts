@@ -5,6 +5,9 @@ export type LeaderboardStatus = "unconfigured" | "loading" | "ready" | "offline"
 export interface LeaderboardEntry {
   id: string;
   name: string;
+  /** Display title; includes the run date for new records. */
+  title?: string;
+  runDate?: string;
   score: number;
   ts: number;
 }
@@ -53,6 +56,17 @@ export function normalizeNickname(raw: string): string | null {
   if (name.length < 2) return null;
   if (!/^[\p{L}\p{N} _-]+$/u.test(name)) return null;
   return name;
+}
+
+/** Local calendar date of the run: ISO for data, DD.MM.YYYY for the title. */
+function runDateInfo(date = new Date()): { runDate: string; label: string } {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return {
+    runDate: `${year}-${month}-${day}`,
+    label: `${day}.${month}.${year}`
+  };
 }
 
 export class Leaderboard {
@@ -157,7 +171,22 @@ export class Leaderboard {
             if (!Number.isFinite(score)) continue;
             const name = typeof value.name === "string" ? value.name.slice(0, 16) : "Игрок";
             const ts = Number.isFinite(Number(value.ts)) ? Number(value.ts) : 0;
-            entries.push({ id, name, score: Math.floor(score), ts });
+            let title =
+              typeof value.title === "string" && value.title.trim()
+                ? value.title.slice(0, 48)
+                : undefined;
+            let runDate =
+              typeof value.runDate === "string" && value.runDate.trim()
+                ? value.runDate.slice(0, 10)
+                : undefined;
+            // Older records predate the title field but still carry a real
+            // timestamp; show their date too instead of leaving them blank.
+            if (!title && ts > 1e12) {
+              const info = runDateInfo(new Date(ts));
+              title = `${name} · ${info.label}`;
+              runDate = info.runDate;
+            }
+            entries.push({ id, name, title, runDate, score: Math.floor(score), ts });
           }
         }
         entries.sort((a, b) => b.score - a.score || a.ts - b.ts);
@@ -178,17 +207,24 @@ export class Leaderboard {
     try {
       const ownUrl = `${this.dbUrl}/leaderboard/${encodeURIComponent(this.playerId)}.json`;
       const existing = await this.fetchJson<{ score?: number } | null>(ownUrl);
-      if (existing && Number(existing.score) >= score) {
-        this.refresh();
-        return;
-      }
+      const existingScore = existing ? Number(existing.score) : NaN;
+      const bestScore =
+        Number.isFinite(existingScore) && existingScore > score
+          ? Math.floor(existingScore)
+          : score;
+      const stamp = new Date();
+      const { runDate, label } = runDateInfo(stamp);
       await fetch(ownUrl, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: this.playerName,
-          score,
-          ts: Date.now()
+          // The date is part of the displayed record title, while the score
+          // remains the player's best result.
+          title: `${this.playerName} · ${label}`,
+          runDate,
+          score: bestScore,
+          ts: stamp.getTime()
         })
       });
       this.refresh();

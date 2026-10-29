@@ -294,8 +294,8 @@ export class UI {
         rank.textContent = String(index + 1);
         const name = document.createElement("span");
         name.className = "leaderboard-name";
-        name.textContent = entry.name;
-        name.title = entry.name;
+        name.textContent = entry.title ?? entry.name;
+        name.title = entry.title ?? entry.name;
         const score = document.createElement("span");
         score.className = "leaderboard-score";
         score.textContent = fmt(entry.score);
