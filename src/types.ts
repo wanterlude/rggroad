@@ -12,6 +12,7 @@ export interface SaveData {
   skin: SkinId;
   unlocked: SkinId[];
   muted: boolean;
+  musicMuted: boolean;
   runs: number;
 }
 

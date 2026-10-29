@@ -53,6 +53,7 @@ export class Game {
       onRestart: () => this.startRun(),
       onMenu: () => this.goMenu(),
       onSound: () => this.toggleSound(),
+      onMusic: () => this.toggleMusic(),
       onSkin: (skin) => this.selectSkin(skin)
     });
 
@@ -61,7 +62,7 @@ export class Game {
     this.camAnchor.set(this.world.player.x, 0, this.world.player.z);
     this.cameraSnap = true;
     this.bindEvents();
-    this.ui.updateSoundUI(this.audio.muted);
+    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted);
     this.ui.showMenu();
     this.ui.updateHUD(0);
     this.updateCamera(0, 0);
@@ -105,7 +106,6 @@ export class Game {
     this.state = "playing";
     this.lastBiomeBoundary = 0;
     this.lastBiomeId = this.world.getBiome().id;
-    this.audio.setBiome(this.lastBiomeId);
     this.score = 0;
     this.startingBest = save.data.best;
     this.newBestShown = false;
@@ -118,7 +118,7 @@ export class Game {
     this.ui.showPlaying();
     this.ui.updateHUD(0);
     this.ui.updateStats();
-    this.ui.updateSoundUI(this.audio.muted);
+    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted);
     this.ui.clearFocus();
   }
 
@@ -139,7 +139,7 @@ export class Game {
     this.ui.showMenu();
     this.ui.updateHUD(0);
     this.ui.updateStats();
-    this.ui.updateSoundUI(this.audio.muted);
+    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted);
     this.ui.clearFocus();
   }
 
@@ -165,9 +165,17 @@ export class Game {
   private toggleSound(): void {
     this.audio.init();
     this.audio.toggleMuted();
-    this.ui.updateSoundUI(this.audio.muted);
+    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted);
     if (!this.audio.muted) this.audio.click();
-    this.ui.showToast(this.audio.muted ? "Звук выключен" : "Звук включён", 1300);
+    this.ui.showToast(this.audio.muted ? "Звуки выключены" : "Звуки включены", 1300);
+  }
+
+  private toggleMusic(): void {
+    this.audio.init();
+    this.audio.toggleMusicMuted();
+    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted);
+    if (!this.audio.muted) this.audio.click();
+    this.ui.showToast(this.audio.musicMuted ? "Музыка выключена" : "Музыка включена", 1300);
   }
 
   private selectSkin(skinId: SkinId): void {
@@ -497,7 +505,6 @@ export class Game {
       const biomeId = this.world.getBiome().id;
       if (biomeId !== this.lastBiomeId) {
         this.lastBiomeId = biomeId;
-        this.audio.setBiome(biomeId);
         this.ui.fadeBiomeTransition();
       }
     }

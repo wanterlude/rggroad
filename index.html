@@ -94,10 +94,16 @@
           </button>
 
           <div class="menu-footer">
-            <button id="menuSoundBtn" class="text-button" type="button" aria-pressed="false">
-              <span class="sound-dot" aria-hidden="true"></span>
-              <span id="menuSoundLabel">ЗВУК ВКЛ</span>
-            </button>
+            <div class="menu-sound-group">
+              <button id="menuSoundBtn" class="text-button" type="button" aria-pressed="false">
+                <span class="sound-dot" aria-hidden="true"></span>
+                <span id="menuSoundLabel">ЗВУКИ ВКЛ</span>
+              </button>
+              <button id="menuMusicBtn" class="text-button" type="button" aria-pressed="false">
+                <span class="music-glyph" aria-hidden="true">♪</span>
+                <span id="menuMusicLabel">МУЗЫКА ВКЛ</span>
+              </button>
+            </div>
             <span class="menu-tip">Собирай монеты · Берегись поездов · Не задерживайся — прилетит орёл</span>
           </div>
         </div>
@@ -117,10 +123,16 @@
             <button id="pauseRestartBtn" class="big-button secondary" type="button">ЗАНОВО</button>
             <button id="pauseMenuBtn" class="big-button ghost" type="button">В МЕНЮ</button>
           </div>
-          <button id="pauseSoundBtn" class="text-button modal-sound" type="button" aria-pressed="false">
-            <span class="sound-dot" aria-hidden="true"></span>
-            <span id="pauseSoundLabel">ЗВУК ВКЛ</span>
-          </button>
+          <div class="modal-sound-row">
+            <button id="pauseSoundBtn" class="text-button" type="button" aria-pressed="false">
+              <span class="sound-dot" aria-hidden="true"></span>
+              <span id="pauseSoundLabel">ЗВУКИ ВКЛ</span>
+            </button>
+            <button id="pauseMusicBtn" class="text-button" type="button" aria-pressed="false">
+              <span class="music-glyph" aria-hidden="true">♪</span>
+              <span id="pauseMusicLabel">МУЗЫКА ВКЛ</span>
+            </button>
+          </div>
         </div>
       </section>
 

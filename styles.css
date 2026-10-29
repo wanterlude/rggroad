@@ -1039,6 +1039,20 @@ button:focus-visible {
   padding: 0 4px;
 }
 
+.menu-sound-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.music-glyph {
+  display: inline-block;
+  font-size: 14px;
+  line-height: 1;
+  text-shadow: none;
+}
+
 .menu-credit,
 .menu-version {
   position: fixed;
@@ -1269,8 +1283,16 @@ button:focus-visible {
   transform: translateY(2px);
 }
 
-.modal-sound {
+.modal-sound-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
   margin-top: 14px;
+}
+
+.modal-sound-row .text-button {
   color: var(--ink-soft);
   text-shadow: none;
 }
@@ -1819,8 +1841,12 @@ button:focus-visible {
     min-height: 32px;
   }
 
-  .modal-sound {
+  .modal-sound-row {
     margin-top: 6px;
+    gap: 10px;
+  }
+
+  .modal-sound-row .text-button {
     font-size: 8px;
   }
 

@@ -10,17 +10,14 @@ export class AudioEngine {
   private master: GainNode | null = null;
   private sfxGain: GainNode | null = null;
   private musicGain: GainNode | null = null;
-  private ambientGain: GainNode | null = null;
-  private ambientFilter: BiquadFilterNode | null = null;
-  private ambientA: OscillatorNode | null = null;
-  private ambientB: OscillatorNode | null = null;
-  private biomeId = "autumn";
+  private musicDucked = false;
   private noiseBuffer: AudioBuffer | null = null;
   private musicTimer: number | null = null;
   private musicStep = 0;
   private nextNoteTime = 0;
   private ready = false;
   muted = save.data.muted;
+  musicMuted = save.data.musicMuted;
 
   init(): boolean {
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -42,34 +39,16 @@ export class AudioEngine {
       compressor.connect(ctx.destination);
 
       this.master = ctx.createGain();
-      this.master.gain.value = this.muted ? 0 : 0.82;
+      this.master.gain.value = 0.82;
       this.master.connect(compressor);
 
       this.sfxGain = ctx.createGain();
-      this.sfxGain.gain.value = 0.9;
+      this.sfxGain.gain.value = this.muted ? 0 : 0.9;
       this.sfxGain.connect(this.master);
 
       this.musicGain = ctx.createGain();
-      this.musicGain.gain.value = 0.42;
+      this.musicGain.gain.value = this.musicMuted ? 0 : 0.42;
       this.musicGain.connect(this.master);
-
-      this.ambientFilter = ctx.createBiquadFilter();
-      this.ambientFilter.type = "lowpass";
-      this.ambientFilter.frequency.value = 420;
-      this.ambientFilter.Q.value = 0.4;
-      this.ambientGain = ctx.createGain();
-      this.ambientGain.gain.value = 0.024;
-      this.ambientFilter.connect(this.ambientGain);
-      this.ambientGain.connect(this.master);
-      this.ambientA = ctx.createOscillator();
-      this.ambientA.type = "sine";
-      this.ambientB = ctx.createOscillator();
-      this.ambientB.type = "triangle";
-      this.ambientA.connect(this.ambientFilter);
-      this.ambientB.connect(this.ambientFilter);
-      this.ambientA.start();
-      this.ambientB.start();
-      this.applyBiomeAmbience();
 
       this.noiseBuffer = this.makeNoise(ctx);
       this.ready = true;
@@ -93,14 +72,15 @@ export class AudioEngine {
     return buffer;
   }
 
+  /** Mute only gameplay SFX; the music keeps playing. */
   setMuted(muted: boolean): void {
     this.muted = muted;
     save.data.muted = muted;
     save.write();
-    if (this.master && this.ctx) {
+    if (this.sfxGain && this.ctx) {
       const now = this.ctx.currentTime;
-      this.master.gain.cancelScheduledValues(now);
-      this.master.gain.setTargetAtTime(muted ? 0 : 0.82, now, 0.025);
+      this.sfxGain.gain.cancelScheduledValues(now);
+      this.sfxGain.gain.setTargetAtTime(muted ? 0 : 0.9, now, 0.025);
     }
   }
 
@@ -110,41 +90,31 @@ export class AudioEngine {
     return this.muted;
   }
 
-  setMusicDucked(ducked: boolean): void {
+  /** Mute only the music; gameplay SFX stay audible. */
+  setMusicMuted(muted: boolean): void {
+    this.musicMuted = muted;
+    save.data.musicMuted = muted;
+    save.write();
+    this.applyMusicGain(0.03);
+  }
+
+  toggleMusicMuted(): boolean {
+    this.init();
+    this.setMusicMuted(!this.musicMuted);
+    return this.musicMuted;
+  }
+
+  private applyMusicGain(smoothing: number): void {
     if (!this.musicGain || !this.ctx) return;
+    const target = this.musicMuted ? 0 : this.musicDucked ? 0.16 : 0.42;
     const now = this.ctx.currentTime;
     this.musicGain.gain.cancelScheduledValues(now);
-    this.musicGain.gain.setTargetAtTime(ducked ? 0.16 : 0.42, now, 0.14);
+    this.musicGain.gain.setTargetAtTime(target, now, smoothing);
   }
 
-  setBiome(id: string): void {
-    this.biomeId = id;
-    this.applyBiomeAmbience();
-  }
-
-  private applyBiomeAmbience(): void {
-    if (!this.ctx || !this.ambientA || !this.ambientB || !this.ambientFilter) return;
-    const pads: Record<string, [number, number, number]> = {
-      autumn: [130.81, 196.0, 480],
-      forest: [110.0, 164.81, 390],
-      ocean: [98.0, 146.83, 520],
-      savanna: [146.83, 220.0, 560],
-      desert: [116.54, 174.61, 440],
-      frost: [164.81, 246.94, 700],
-      candy: [174.61, 261.63, 760],
-      jungle: [123.47, 185.0, 420],
-      city: [82.41, 123.47, 350],
-      prehistoric: [92.5, 138.59, 360],
-      halloween: [103.83, 155.56, 330],
-      lava: [73.42, 110.0, 300],
-      space: [65.41, 98.0, 620],
-      void: [55.0, 82.41, 260]
-    };
-    const [a, b, cutoff] = pads[this.biomeId] ?? pads.autumn;
-    const now = this.ctx.currentTime;
-    this.ambientA.frequency.setTargetAtTime(a, now, 0.45);
-    this.ambientB.frequency.setTargetAtTime(b, now, 0.45);
-    this.ambientFilter.frequency.setTargetAtTime(cutoff, now, 0.5);
+  setMusicDucked(ducked: boolean): void {
+    this.musicDucked = ducked;
+    this.applyMusicGain(0.14);
   }
 
   private canPlay(): boolean {
@@ -301,7 +271,7 @@ export class AudioEngine {
   }
 
   private scheduleMusic(): void {
-    if (!this.ctx || this.muted || this.ctx.state !== "running") return;
+    if (!this.ctx || this.musicMuted || this.ctx.state !== "running") return;
     const now = this.ctx.currentTime;
     if (this.nextNoteTime < now - 0.5) this.nextNoteTime = now + 0.08;
     while (this.nextNoteTime < now + 0.22) {

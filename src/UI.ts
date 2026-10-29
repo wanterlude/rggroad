@@ -13,6 +13,7 @@ interface UIHandlers {
   onRestart: () => void;
   onMenu: () => void;
   onSound: () => void;
+  onMusic: () => void;
   onSkin: (skin: SkinId) => void;
 }
 
@@ -49,6 +50,10 @@ export class UI {
     pauseSoundLabel: $("pauseSoundLabel"),
     menuSoundBtn: $<HTMLButtonElement>("menuSoundBtn"),
     pauseSoundBtn: $<HTMLButtonElement>("pauseSoundBtn"),
+    menuMusicLabel: $("menuMusicLabel"),
+    pauseMusicLabel: $("pauseMusicLabel"),
+    menuMusicBtn: $<HTMLButtonElement>("menuMusicBtn"),
+    pauseMusicBtn: $<HTMLButtonElement>("pauseMusicBtn"),
     playBtn: $<HTMLButtonElement>("playBtn"),
     pauseBtn: $<HTMLButtonElement>("pauseBtn"),
     resumeBtn: $<HTMLButtonElement>("resumeBtn"),
@@ -90,7 +95,10 @@ export class UI {
     refs.overMenuBtn.addEventListener("click", () => handlers.onMenu());
     refs.menuSoundBtn.addEventListener("click", () => handlers.onSound());
     refs.pauseSoundBtn.addEventListener("click", () => handlers.onSound());
+    refs.menuMusicBtn.addEventListener("click", () => handlers.onMusic());
+    refs.pauseMusicBtn.addEventListener("click", () => handlers.onMusic());
     refs.pauseSoundBtn.setAttribute("aria-pressed", "false");
+    refs.pauseMusicBtn.setAttribute("aria-pressed", "false");
     refs.skinPrev.addEventListener("click", () => this.scrollSkin(-1));
     window.addEventListener("resize", () => this.positionArtworkCard());
     refs.skinNext.addEventListener("click", () => this.scrollSkin(1));
@@ -305,12 +313,17 @@ export class UI {
     this.refs.bestValue.textContent = fmt(save.data.best);
   }
 
-  updateSoundUI(muted: boolean): void {
-    const label = muted ? "ЗВУК ВЫКЛ" : "ЗВУК ВКЛ";
-    this.refs.menuSoundLabel.textContent = label;
-    this.refs.pauseSoundLabel.textContent = label;
+  updateSoundUI(muted: boolean, musicMuted: boolean): void {
+    const soundLabel = muted ? "ЗВУКИ ВЫКЛ" : "ЗВУКИ ВКЛ";
+    const musicLabel = musicMuted ? "МУЗЫКА ВЫКЛ" : "МУЗЫКА ВКЛ";
+    this.refs.menuSoundLabel.textContent = soundLabel;
+    this.refs.pauseSoundLabel.textContent = soundLabel;
+    this.refs.menuMusicLabel.textContent = musicLabel;
+    this.refs.pauseMusicLabel.textContent = musicLabel;
     this.refs.menuSoundBtn.setAttribute("aria-pressed", String(muted));
     this.refs.pauseSoundBtn.setAttribute("aria-pressed", String(muted));
+    this.refs.menuMusicBtn.setAttribute("aria-pressed", String(musicMuted));
+    this.refs.pauseMusicBtn.setAttribute("aria-pressed", String(musicMuted));
   }
 
   showNewBestBadge(): void {

@@ -1,4 +1,4 @@
-﻿import { SAVE_KEY, SKINS, SKIN_ORDER, type SkinId } from "./config";
+import { SAVE_KEY, SKINS, SKIN_ORDER, type SkinId } from "./config";
 import type { SaveData } from "./types";
 
 const defaults: SaveData = {
@@ -7,6 +7,7 @@ const defaults: SaveData = {
   skin: "moryaka",
   unlocked: [...SKIN_ORDER],
   muted: false,
+  musicMuted: false,
   runs: 0
 };
 
@@ -33,6 +34,7 @@ function sanitize(raw: unknown): SaveData {
 
   if (isSkinId(src.skin) && unlocked.includes(src.skin)) data.skin = src.skin;
   data.muted = src.muted === true;
+  data.musicMuted = src.musicMuted === true;
   return data;
 }
 
