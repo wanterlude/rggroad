@@ -2987,6 +2987,103 @@ function buildKnjazevdesu(_skin: SkinDef): CubeSpec[] {
   return c;
 }
 
+function buildVex(skin: SkinDef): CubeSpec[] {
+  const c: CubeSpec[] = [];
+  const metal = skin.body;
+  const dark = skin.bodyShade;
+  const light = skin.wing;
+  const glow = skin.comb;
+  const joint = 0x2a3038;
+  const visor = 0x101820;
+
+  // Chunky boots and piston legs.
+  for (const side of [-1, 1]) {
+    part(c, joint, side * 0.16, 0, 0.05, 0.24, 0.1, 0.34);
+    part(c, dark, side * 0.16, 0.1, 0.0, 0.16, 0.16, 0.2);
+    part(c, metal, side * 0.16, 0.22, 0.0, 0.18, 0.18, 0.22);
+  }
+
+  // Torso, chest plate and glowing core.
+  part(c, dark, 0, 0.34, -0.02, 0.44, 0.12, 0.32);
+  part(c, metal, 0, 0.42, 0, 0.5, 0.3, 0.36);
+  part(c, light, 0, 0.55, 0.02, 0.4, 0.1, 0.34);
+  part(c, dark, 0, 0.44, 0.2, 0.3, 0.18, 0.03);
+  part(c, glow, 0, 0.48, 0.225, 0.12, 0.06, 0.02);
+  // Backpack with a glowing spine, visible from the chase camera.
+  part(c, joint, 0, 0.44, -0.21, 0.32, 0.22, 0.1);
+  part(c, glow, 0, 0.52, -0.27, 0.08, 0.12, 0.02);
+  part(c, dark, 0, 0.86, -0.19, 0.28, 0.16, 0.04);
+
+  // Shoulders and arms with wrist lights.
+  for (const side of [-1, 1]) {
+    part(c, dark, side * 0.3, 0.62, 0, 0.16, 0.1, 0.28);
+    part(c, metal, side * 0.34, 0.4, 0, 0.14, 0.24, 0.2);
+    part(c, joint, side * 0.34, 0.3, 0.02, 0.12, 0.12, 0.16);
+    part(c, glow, side * 0.34, 0.36, 0.12, 0.05, 0.05, 0.02);
+  }
+
+  // Neck and head.
+  part(c, joint, 0, 0.72, 0, 0.18, 0.08, 0.18);
+  part(c, metal, 0, 0.78, 0.04, 0.46, 0.32, 0.36);
+  part(c, light, 0, 0.92, 0.02, 0.4, 0.06, 0.32);
+  part(c, visor, 0, 0.84, 0.225, 0.36, 0.14, 0.04);
+  for (const side of [-1, 1]) {
+    part(c, glow, side * 0.1, 0.88, 0.245, 0.07, 0.04, 0.02);
+    part(c, dark, side * 0.25, 0.82, 0, 0.06, 0.2, 0.28);
+    part(c, glow, side * 0.27, 0.86, 0.05, 0.04, 0.06, 0.1);
+  }
+
+  // Antenna.
+  part(c, joint, 0, 1.04, -0.02, 0.04, 0.12, 0.04);
+  part(c, glow, 0, 1.16, -0.02, 0.1, 0.1, 0.1);
+  return c;
+}
+
+function buildBao(skin: SkinDef): CubeSpec[] {
+  const c: CubeSpec[] = [];
+  const white = skin.body;
+  const black = skin.bodyShade;
+  const belly = skin.belly;
+  const pink = skin.comb;
+  const bamboo = skin.accent;
+
+  // Black feet and legs.
+  for (const side of [-1, 1]) {
+    part(c, black, side * 0.15, 0, 0.05, 0.22, 0.1, 0.3);
+    part(c, black, side * 0.15, 0.1, 0.0, 0.16, 0.26, 0.2);
+  }
+
+  // Round white body and belly patch.
+  part(c, white, 0, 0.36, 0.02, 0.52, 0.34, 0.36);
+  part(c, belly, 0, 0.38, 0.2, 0.34, 0.24, 0.04);
+  part(c, black, 0, 0.42, -0.22, 0.16, 0.14, 0.08);
+
+  // Black arms and paws.
+  for (const side of [-1, 1]) {
+    part(c, black, side * 0.32, 0.42, 0.02, 0.16, 0.34, 0.24);
+    part(c, black, side * 0.3, 0.36, 0.16, 0.12, 0.12, 0.12);
+  }
+
+  // Head, ears and eye patches.
+  part(c, white, 0, 0.7, 0.02, 0.2, 0.08, 0.2);
+  part(c, white, 0, 0.76, 0.06, 0.52, 0.4, 0.4);
+  for (const side of [-1, 1]) {
+    part(c, black, side * 0.2, 1.1, -0.02, 0.16, 0.16, 0.14);
+    part(c, black, side * 0.14, 0.86, 0.25, 0.16, 0.16, 0.04);
+    part(c, skin.eye, side * 0.14, 0.9, 0.275, 0.05, 0.05, 0.02);
+    part(c, skin.pupil, side * 0.14, 0.9, 0.29, 0.025, 0.03, 0.01);
+    part(c, pink, side * 0.25, 0.8, 0.24, 0.06, 0.04, 0.01);
+  }
+  part(c, belly, 0, 0.78, 0.265, 0.2, 0.12, 0.03);
+  part(c, black, 0, 0.86, 0.285, 0.06, 0.04, 0.02);
+
+  // A bamboo stalk on the back.
+  part(c, bamboo, 0.26, 0.4, -0.24, 0.05, 0.62, 0.05, 0.18);
+  part(c, 0x8ed06a, 0.33, 0.86, -0.24, 0.16, 0.04, 0.02, -0.3);
+  part(c, 0x8ed06a, 0.19, 0.95, -0.24, 0.13, 0.04, 0.02, 0.4);
+  return c;
+}
+
 export function buildCharacter(skinId: SkinId): THREE.Group {
   const skin = SKINS[skinId];
   let cubes: CubeSpec[];
@@ -3003,8 +3100,10 @@ export function buildCharacter(skinId: SkinId): THREE.Group {
   else if (skin.style === "amelia") cubes = buildAmelia(skin);
   else if (skin.style === "nyamuras") cubes = buildNyamuras(skin);
   else if (skin.style === "knjazevdesu") cubes = buildKnjazevdesu(skin);
+  else if (skin.style === "vex") cubes = buildVex(skin);
+  else if (skin.style === "bao") cubes = buildBao(skin);
   else cubes = buildDitoshey(skin);
-  if (skin.style !== "moryaka" && skin.style !== "severina" && skin.style !== "snezha" && skin.style !== "meowlody" && skin.style !== "miliray" && skin.style !== "yuchii" && skin.style !== "alaskanyan" && skin.style !== "alysque" && skin.style !== "amelia" && skin.style !== "nyamuras" && skin.style !== "knjazevdesu" && skin.style !== "higanbanban") {
+  if (skin.style !== "moryaka" && skin.style !== "severina" && skin.style !== "snezha" && skin.style !== "meowlody" && skin.style !== "miliray" && skin.style !== "yuchii" && skin.style !== "alaskanyan" && skin.style !== "alysque" && skin.style !== "amelia" && skin.style !== "nyamuras" && skin.style !== "knjazevdesu" && skin.style !== "higanbanban" && skin.style !== "vex" && skin.style !== "bao") {
     addHairDepth(cubes, skin.mane, "long");
     addRearDetails(cubes, skin.style);
     addBackOutfit(cubes, skin.style);

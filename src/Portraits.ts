@@ -1,4 +1,4 @@
-﻿import { SKINS, type SkinId } from "./config";
+import { SKINS, type SkinId } from "./config";
 import { TAU, cssColor } from "./utils";
 import { ART_HEAD_CROPS, GENERATED_ART } from "./assets/art";
 
@@ -614,6 +614,109 @@ function drawDitosheyPortrait(ctx: CanvasRenderingContext2D, W: number, H: numbe
   ctx.restore();
 }
 
+function drawVexPortrait(ctx: CanvasRenderingContext2D, W: number, H: number): void {
+  const cx = W * 0.5;
+  const ink = "rgba(20, 40, 45, 0.32)";
+  const metal = "#53d7c7";
+  const dark = "#2c8d84";
+  const light = "#9af4e8";
+  const glow = "#a7ff5f";
+  const joint = "#2a3038";
+  const visor = "#101820";
+
+  ellipseFill(ctx, cx, H * 0.85, W * 0.24, H * 0.05, "rgba(20, 40, 45, 0.2)");
+
+  // Shoulders and torso.
+  roundFill(ctx, cx - 48, H * 0.58, 20, H * 0.13, 8, dark, ink);
+  roundFill(ctx, cx + 28, H * 0.58, 20, H * 0.13, 8, dark, ink);
+  roundFill(ctx, cx - 38, H * 0.57, 76, H * 0.24, 14, metal, ink);
+  roundFill(ctx, cx - 28, H * 0.6, 56, H * 0.16, 8, dark, ink);
+  roundFill(ctx, cx - 12, H * 0.62, 24, H * 0.07, 4, visor);
+  ellipseFill(ctx, cx, H * 0.655, 6, 6, glow);
+
+  // Head, side panels and visor.
+  roundFill(ctx, cx - 44, H * 0.22, 88, H * 0.32, 18, metal, ink);
+  roundFill(ctx, cx - 36, H * 0.25, 72, H * 0.06, 4, light);
+  roundFill(ctx, cx - 52, H * 0.27, 12, H * 0.18, 5, joint, ink);
+  roundFill(ctx, cx + 40, H * 0.27, 12, H * 0.18, 5, joint, ink);
+  roundFill(ctx, cx - 32, H * 0.33, 64, H * 0.13, 8, visor, ink);
+  ellipseFill(ctx, cx - 14, H * 0.395, 7, 7, glow);
+  ellipseFill(ctx, cx + 14, H * 0.395, 7, 7, glow);
+  ellipseFill(ctx, cx - 14, H * 0.395, 3, 3, "#eaffd5");
+  ellipseFill(ctx, cx + 14, H * 0.395, 3, 3, "#eaffd5");
+
+  // Antenna.
+  ctx.strokeStyle = joint;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(cx, H * 0.22);
+  ctx.lineTo(cx, H * 0.12);
+  ctx.stroke();
+  ellipseFill(ctx, cx, H * 0.105, 7, 7, glow);
+  ellipseFill(ctx, cx - 2, H * 0.1, 2, 2, "#f2ffdf");
+
+  // Metallic highlight.
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(cx - 28, H * 0.27);
+  ctx.lineTo(cx - 10, H * 0.25);
+  ctx.stroke();
+}
+
+function drawBaoPortrait(ctx: CanvasRenderingContext2D, W: number, H: number): void {
+  const cx = W * 0.5;
+  const ink = "rgba(36, 33, 31, 0.3)";
+  const white = "#fff3e0";
+  const black = "#24211f";
+  const belly = "#ffe9cc";
+  const pink = "#ff8fa8";
+  const eye = "#e8d8bc";
+  const pupil = "#1b1714";
+  const bamboo = "#7fbf5a";
+
+  ellipseFill(ctx, cx, H * 0.85, W * 0.24, H * 0.05, "rgba(36, 33, 31, 0.18)");
+
+  // Bamboo stalk behind the panda.
+  roundFill(ctx, cx - 74, H * 0.16, 10, H * 0.56, 5, bamboo, ink);
+  ellipseFill(ctx, cx - 52, H * 0.24, 18, 6, "#8ed06a");
+  ellipseFill(ctx, cx - 86, H * 0.34, 16, 6, "#8ed06a");
+  ellipseFill(ctx, cx - 54, H * 0.43, 14, 5, "#8ed06a");
+
+  // Body and arms.
+  roundFill(ctx, cx - 36, H * 0.57, 72, H * 0.25, 22, white, ink);
+  ellipseFill(ctx, cx, H * 0.66, 20, 24, belly);
+  roundFill(ctx, cx - 52, H * 0.58, 20, H * 0.13, 8, black, ink);
+  roundFill(ctx, cx + 32, H * 0.58, 20, H * 0.13, 8, black, ink);
+
+  // Head and ears.
+  roundFill(ctx, cx - 46, H * 0.18, 92, H * 0.38, 26, white, ink);
+  ellipseFill(ctx, cx - 32, H * 0.16, 16, 16, black);
+  ellipseFill(ctx, cx + 32, H * 0.16, 16, 16, black);
+
+  // Tilted black eye patches.
+  for (const side of [-1, 1]) {
+    ctx.save();
+    ctx.translate(cx + side * 18, H * 0.315);
+    ctx.rotate(side * 0.26);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 15, 18, 0, 0, TAU);
+    ctx.fillStyle = black;
+    ctx.fill();
+    ctx.restore();
+  }
+  ellipseFill(ctx, cx - 16, H * 0.33, 5.5, 5.5, eye);
+  ellipseFill(ctx, cx + 16, H * 0.33, 5.5, 5.5, eye);
+  ellipseFill(ctx, cx - 16, H * 0.33, 2.6, 2.6, pupil);
+  ellipseFill(ctx, cx + 16, H * 0.33, 2.6, 2.6, pupil);
+
+  // Muzzle and nose.
+  ellipseFill(ctx, cx, H * 0.43, 16, 12, belly);
+  ellipseFill(ctx, cx, H * 0.405, 5.5, 4, black);
+  ellipseFill(ctx, cx - 30, H * 0.4, 5, 3, pink);
+  ellipseFill(ctx, cx + 30, H * 0.4, 5, 3, pink);
+}
+
 function paintPortrait(canvasEl: HTMLCanvasElement, key: SkinId): void {
   const ctx = canvasEl.getContext("2d");
   if (!ctx) return;
@@ -649,6 +752,14 @@ function paintPortrait(canvasEl: HTMLCanvasElement, key: SkinId): void {
   }
   if (skin.style === "moryaka") {
     drawMoryakaPortrait(ctx, W, H);
+    return;
+  }
+  if (skin.style === "vex") {
+    drawVexPortrait(ctx, W, H);
+    return;
+  }
+  if (skin.style === "bao") {
+    drawBaoPortrait(ctx, W, H);
     return;
   }
 
