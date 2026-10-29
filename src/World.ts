@@ -17,9 +17,11 @@ import {
 } from "./config";
 import {
   biomeForZ,
+  biomeSegmentAt,
   BIOMES,
   BIOME_ORDER,
-  BIOME_SPAN,
+  INTERMEDIATE_SPAN,
+  isSpecialBankRow,
   type BiomeDecorKind,
   type BiomeDef,
   type BiomeId,
@@ -277,9 +279,12 @@ export class World {
   }
 
   getNextBiomeBoundary(): number {
-    const span = this.mode === "demo" ? DEMO_BIOME_SPAN : BIOME_SPAN;
-    const z = Math.max(0, this.player.z);
-    return (Math.floor(z / span) + 1) * span;
+    if (this.mode === "demo") {
+      const span = DEMO_BIOME_SPAN;
+      const z = Math.max(0, this.player.z);
+      return (Math.floor(z / span) + 1) * span;
+    }
+    return Math.max(1, biomeSegmentAt(Math.max(0, this.player.z)).end);
   }
 
   private biomeAt(z: number) {
@@ -462,17 +467,39 @@ export class World {
 
   private generateAhead(target: number): void {
     let guard = 0;
-    while (this.frontier < target && guard++ < 600) {
+    while (this.frontier < target && guard++ < 900) {
       const z = this.frontier + 1;
       const type = this.chooseSegment(z);
       if (type === "road") this.addRoadSegment(z);
       else if (type === "river") this.addRiverSegment(z);
       else if (type === "rail") this.addRailSegment(z);
+      else if (type === "bank") this.addBankRow(z);
+      else if (type === "flood") this.addFloodRow(z);
+      else if (type === "crossroads") this.addCrossroadRow(z);
       else this.addSafeSegment(z);
     }
   }
 
-  private chooseSegment(z: number): "road" | "river" | "rail" | "safe" {
+  private chooseSegment(
+    z: number
+  ): "road" | "river" | "rail" | "safe" | "bank" | "flood" | "crossroads" {
+    // Biome lab: a forced flood/crossroads run repeats the 12-row pattern.
+    if (this.forceBiomeId === "flood" || this.forceBiomeId === "crossroads") {
+      const rel = ((z % INTERMEDIATE_SPAN) + INTERMEDIATE_SPAN) % INTERMEDIATE_SPAN;
+      if (isSpecialBankRow(rel)) return "bank";
+      return this.forceBiomeId === "flood" ? "flood" : "crossroads";
+    }
+
+    const segment = biomeSegmentAt(z);
+    if (
+      segment.kind === "intermediate" &&
+      (segment.biome === "flood" || segment.biome === "crossroads")
+    ) {
+      const rel = z - segment.start;
+      if (isSpecialBankRow(rel)) return "bank";
+      return segment.biome === "flood" ? "flood" : "crossroads";
+    }
+
     const r = this.rng();
     const d = clamp(z / 95, 0, 1);
     if (z < 6) return "road";
@@ -495,8 +522,33 @@ export class World {
     return "safe";
   }
 
+  private segmentRoom(z: number): number {
+    return Math.max(1, biomeSegmentAt(z).end - z);
+  }
+
+  private addBankRow(z: number): void {
+    this.attachRow(this.makeGrassRow(z, { allowProps: false, allowCoin: true }));
+    this.frontier = z;
+  }
+
+  private addFloodRow(z: number): void {
+    const d = clamp(z / 95, 0, 1);
+    const dir: 1 | -1 = this.rng() < 0.5 ? 1 : -1;
+    const speed = rr(this.rng, 0.85, 1.6) * (1 + d * 0.3);
+    this.attachRow(this.makeWaterRow(z, dir, speed, d));
+    this.frontier = z;
+  }
+
+  private addCrossroadRow(z: number): void {
+    const d = clamp(z / 95, 0, 1);
+    const dir: 1 | -1 = this.rng() < 0.5 ? 1 : -1;
+    const speed = rr(this.rng, 1.9, 3.0) * (1 + d * 0.5) * this.mechanicsAt(z).speed;
+    this.attachRow(this.makeRoadRow(z, dir, speed, d));
+    this.frontier = z;
+  }
+
   private addSafeSegment(z: number): void {
-    const width = 1 + (this.rng() < 0.58 ? 1 : 0);
+    const width = Math.min(1 + (this.rng() < 0.58 ? 1 : 0), this.segmentRoom(z));
     for (let i = 0; i < width; i++) {
       this.attachRow(this.makeGrassRow(z + i, { allowProps: true, allowCoin: true }));
     }
@@ -505,7 +557,10 @@ export class World {
 
   private addRoadSegment(z: number): void {
     const d = clamp(z / 95, 0, 1);
-    const width = clamp(1 + Math.floor(this.rng() * (1.45 + d * 2.2)), 1, 4);
+    const width = Math.min(
+      clamp(1 + Math.floor(this.rng() * (1.45 + d * 2.2)), 1, 4),
+      this.segmentRoom(z)
+    );
     const baseDir: 1 | -1 = this.rng() < 0.5 ? 1 : -1;
     for (let i = 0; i < width; i++) {
       const dir: 1 | -1 = i % 2 === 0 ? baseDir : baseDir === 1 ? -1 : 1;
@@ -518,7 +573,10 @@ export class World {
 
   private addRiverSegment(z: number): void {
     const d = clamp(z / 95, 0, 1);
-    const width = clamp(1 + Math.floor(this.rng() * (1.05 + d * 1.45)), 1, 3);
+    const width = Math.min(
+      clamp(1 + Math.floor(this.rng() * (1.05 + d * 1.45)), 1, 3),
+      this.segmentRoom(z)
+    );
     const baseDir: 1 | -1 = this.rng() < 0.5 ? 1 : -1;
     for (let i = 0; i < width; i++) {
       const dir: 1 | -1 = i % 2 === 0 ? baseDir : baseDir === 1 ? -1 : 1;
@@ -537,9 +595,15 @@ export class World {
   }
 
   private addSpacer(z: number): void {
-    const width = this.rng() < 0.34 ? 2 : 1;
+    const width = Math.min(this.rng() < 0.34 ? 2 : 1, this.segmentRoom(z));
+    const segment = biomeSegmentAt(z);
+    const clearBank =
+      segment.kind === "intermediate" &&
+      (segment.biome === "flood" || segment.biome === "crossroads");
     for (let i = 0; i < width; i++) {
-      this.attachRow(this.makeGrassRow(z + i, { allowProps: true, allowCoin: true }));
+      this.attachRow(
+        this.makeGrassRow(z + i, { allowProps: !clearBank, allowCoin: true })
+      );
     }
     this.frontier = z + width - 1;
   }
@@ -1559,8 +1623,10 @@ export class World {
           return node.first;
         }
 
-        // Waiting is only allowed where the player can actually stand.
-        if (this.demoCanWait(row, node.ride)) {
+        // Waiting is only allowed where the player can actually stand, and
+        // never as the very first action: the caller already waits on a safe
+        // row and re-plans, so a root wait would loop forever.
+        if (node.step > 0 && this.demoCanWait(row, node.ride)) {
           const nextStep = node.step + 1;
           if (nextStep <= DEMO_PLAN_MAX_STEPS) {
             let x = node.x;

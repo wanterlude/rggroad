@@ -1,6 +1,6 @@
 import "../styles.css";
 import { Game } from "./Game";
-import { BIOME_ORDER, type BiomeId } from "./biomes";
+import { BIOME_ORDER, INTERMEDIATE_ORDER, type BiomeId } from "./biomes";
 import { save } from "./save";
 import { setMoryakaEyeVariant } from "./Models";
 
@@ -47,7 +47,9 @@ try {
   const biomeRaw = query.get("biome");
   const seed = seedRaw !== null && Number.isFinite(Number(seedRaw)) ? Math.max(0, Math.trunc(Number(seedRaw))) : undefined;
   const row = rowRaw !== null && Number.isFinite(Number(rowRaw)) ? Math.max(0, Math.trunc(Number(rowRaw))) : undefined;
-  const biome = biomeRaw !== null && (BIOME_ORDER as string[]).includes(biomeRaw) ? (biomeRaw as BiomeId) : undefined;
+  const knownBiomes: string[] = [...BIOME_ORDER, ...INTERMEDIATE_ORDER];
+  const biome =
+    biomeRaw !== null && knownBiomes.includes(biomeRaw) ? (biomeRaw as BiomeId) : undefined;
   const game = new Game(canvas, {
     seed,
     row,

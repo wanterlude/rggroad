@@ -2491,6 +2491,69 @@ body.menu-active #game {
 }
 
 /* Biome announcement */
+/* ---------- Weather overlay (storm intermediate) ---------- */
+.weather {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 700ms ease;
+  background: linear-gradient(180deg, rgba(10, 24, 40, 0.45), rgba(10, 24, 40, 0.2));
+  box-shadow: inset 0 0 160px rgba(4, 12, 22, 0.55);
+}
+
+.weather.is-storm {
+  opacity: 1;
+}
+
+.weather::before,
+.weather::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    100deg,
+    transparent 0 24px,
+    rgba(196, 228, 255, 0.3) 24px 25px,
+    transparent 25px 50px
+  );
+  background-size: 260px 260px;
+  animation: rain-fall 0.55s linear infinite;
+}
+
+.weather::after {
+  background-image: repeating-linear-gradient(
+    100deg,
+    transparent 0 44px,
+    rgba(214, 240, 255, 0.16) 44px 45px,
+    transparent 45px 90px
+  );
+  background-size: 340px 340px;
+  animation: rain-fall-2 0.85s linear infinite;
+  animation-delay: -0.35s;
+}
+
+@keyframes rain-fall {
+  to {
+    background-position: -52px 260px;
+  }
+}
+
+@keyframes rain-fall-2 {
+  to {
+    background-position: -40px 340px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weather::before,
+  .weather::after {
+    animation: none;
+  }
+}
+
 .biome-banner {
   position: fixed;
   left: 50%;

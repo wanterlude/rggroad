@@ -21,7 +21,10 @@ export type NewBiomeId =
   | "prehistoric"
   | "halloween";
 
-export type BiomeId = BaseBiomeId | NewBiomeId;
+/** Short challenge segments inserted after every third main biome. */
+export type SpecialBiomeId = "storm" | "flood" | "crossroads";
+
+export type BiomeId = BaseBiomeId | NewBiomeId | SpecialBiomeId;
 
 export type IdleHazardKind = "eagle" | "vulture" | "bat" | "ufo" | "candy-plane" | "pterodactyl";
 export type WaterStyle = "logs" | "crocodile" | "lily" | "chocolate" | "ice";
@@ -45,6 +48,8 @@ export interface BiomeMechanics {
   rollers?: "log" | "tumbleweed";
   /** City: cars stop at red and drive at green. */
   lights?: boolean;
+  /** Storm intermediate: rain overlay and a darker sky. */
+  storm?: boolean;
 }
 
 export type BiomePropKind =
@@ -132,6 +137,10 @@ export interface BiomeDef {
 }
 
 export const BIOME_SPAN = 30;
+/** A short special segment is inserted after this many main biomes. */
+export const MAIN_BIOMES_PER_INTERMEDIATE = 3;
+export const INTERMEDIATE_SPAN = 12;
+export const INTERMEDIATE_ORDER: SpecialBiomeId[] = ["storm", "flood", "crossroads"];
 
 export const BIOME_ORDER: BiomeId[] = [
   "autumn",
@@ -590,7 +599,7 @@ for (const [id, biome] of Object.entries(BASE_BIOMES) as [BaseBiomeId, BiomeDef]
 }
 
 function variant(
-  id: NewBiomeId,
+  id: BiomeId,
   name: string,
   base: BaseBiomeId,
   overrides: Partial<BiomeDef>
@@ -863,18 +872,206 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
   })
 };
 
-export const BIOMES: Record<BiomeId, BiomeDef> = {
-  ...BASE_BIOMES,
-  ...NEW_BIOMES
+const SPECIAL_BIOMES: Record<SpecialBiomeId, BiomeDef> = {
+  storm: variant("storm", "ГРОЗА", "ocean", {
+    grass: [0x3f5a4c, 0x375245, 0x486454],
+    grassLight: 0x5f7f6a,
+    grassDark: 0x2a4036,
+    road: 0x2a3038,
+    roadAlt: 0x323840,
+    roadLine: 0xd8e6e0,
+    curb: 0x8fa39a,
+    water: 0x2b6f7d,
+    waterDeep: 0x1c4f5a,
+    waterLight: 0x7fc4cf,
+    leaves: [0x3f6b4a, 0x355c40, 0x4d7c57, 0x2b4d36],
+    leavesLight: [0x6b9673, 0x5a8262, 0x7fa987],
+    trunk: 0x4a3b30,
+    rock: 0x66736f,
+    rockDark: 0x4a5552,
+    rockLight: 0x8a9893,
+    flowers: [0xb8d8c8, 0xffd84a, 0xd8f0ff, 0xa8c8b8],
+    ground: 0x355043,
+    fog: 0x1b2a2a,
+    light: 0xbfd8d0,
+    lightIntensity: 1.35,
+    hemiSky: 0x6d8a80,
+    hemiGround: 0x1d2b26,
+    propWeights: [
+      { kind: "deadTree", weight: 2 },
+      { kind: "pine", weight: 1.4 },
+      { kind: "rock", weight: 1.3 },
+      { kind: "bush", weight: 1 }
+    ],
+    decorWeights: [
+      { kind: "pebble", weight: 0.4 },
+      { kind: "tuft", weight: 0.3 },
+      { kind: "flower", weight: 0.1 }
+    ],
+    mechanics: {
+      speed: 1.45,
+      road: 0.45,
+      river: 0.24,
+      rail: 0.14,
+      water: "logs",
+      police: false,
+      idle: "eagle",
+      stampede: false,
+      storm: true
+    }
+  }),
+  flood: variant("flood", "ПОЛОВОДЬЕ", "ocean", {
+    grass: [0x6fae8a, 0x67a682, 0x7cbb96],
+    grassLight: 0x9ed8b2,
+    grassDark: 0x4f8a69,
+    road: 0x4b535c,
+    roadAlt: 0x454d56,
+    water: 0x2fb4c9,
+    waterDeep: 0x1d8fa5,
+    waterLight: 0xa2f0e5,
+    leaves: [0x4f9e4a, 0x428a3f, 0x62b25c, 0x357a36],
+    leavesLight: [0x7cc46f, 0x69b35d, 0x8ed07f],
+    trunk: 0x7a5130,
+    rock: 0x9aa8a2,
+    rockDark: 0x74827c,
+    rockLight: 0xc4d2ca,
+    flowers: [0xfff4cf, 0xffd84a, 0xff8fbb, 0xd8f0ff],
+    ground: 0x5a9a78,
+    fog: 0xbfe8e2,
+    light: 0xe8fff8,
+    lightIntensity: 2.1,
+    propWeights: [
+      { kind: "palm", weight: 2.2 },
+      { kind: "rock", weight: 1.2 },
+      { kind: "bush", weight: 1 },
+      { kind: "deadTree", weight: 0.6 }
+    ],
+    decorWeights: [
+      { kind: "shell", weight: 0.5 },
+      { kind: "pebble", weight: 0.2 },
+      { kind: "flower", weight: 0.1 }
+    ],
+    mechanics: {
+      speed: 1,
+      road: 0,
+      river: 1,
+      rail: 0,
+      water: "logs",
+      police: false,
+      idle: "eagle",
+      stampede: false
+    }
+  }),
+  crossroads: variant("crossroads", "ПЕРЕКРЁСТОК", "autumn", {
+    grass: [0x8a9a6a, 0x81915f, 0x96a675],
+    grassLight: 0xa8b788,
+    grassDark: 0x6a7a4f,
+    road: 0x30343c,
+    roadAlt: 0x383c44,
+    roadLine: 0xffd23f,
+    curb: 0xd8d3ba,
+    water: 0x4f9fae,
+    waterDeep: 0x33717e,
+    waterLight: 0xadd8dd,
+    leaves: [0x7a8a4a, 0x6c7c42, 0x8a9a5a, 0x5e6e3a],
+    leavesLight: [0x9aaa6a, 0x889858, 0xacbc7c],
+    trunk: 0x6b4a2c,
+    rock: 0x8b9098,
+    rockDark: 0x666b72,
+    rockLight: 0xb9bec4,
+    flowers: [0xffd84a, 0xffffff, 0xe96d6d, 0xf1c433],
+    ground: 0x7a8a5a,
+    fog: 0xd8d2c0,
+    light: 0xfff0d0,
+    lightIntensity: 2,
+    propWeights: [
+      { kind: "rock", weight: 1.4 },
+      { kind: "bush", weight: 1.2 },
+      { kind: "stump", weight: 0.8 },
+      { kind: "deadTree", weight: 0.6 }
+    ],
+    decorWeights: [
+      { kind: "pebble", weight: 0.5 },
+      { kind: "tuft", weight: 0.2 }
+    ],
+    mechanics: {
+      speed: 1.25,
+      road: 1,
+      river: 0,
+      rail: 0,
+      water: "logs",
+      police: true,
+      idle: "eagle",
+      stampede: false,
+      lights: true
+    }
+  })
 };
 
-export function biomeIndexForZ(z: number): number {
-  if (z <= 0) return 0;
-  return Math.floor(z / BIOME_SPAN) % BIOME_ORDER.length;
+export const BIOMES: Record<BiomeId, BiomeDef> = {
+  ...BASE_BIOMES,
+  ...NEW_BIOMES,
+  ...SPECIAL_BIOMES
+};
+
+export interface BiomeSegment {
+  start: number;
+  end: number;
+  biome: BiomeId;
+  kind: "main" | "intermediate";
+}
+
+// Precomputed run plan: main biomes of 30 rows with a short intermediate
+// segment after every third main biome. Precomputing keeps biomeForZ cheap
+// even though segment lengths differ.
+const SCHEDULE_ROWS = 240_000;
+const SEGMENTS: BiomeSegment[] = [];
+{
+  let z = 0;
+  let mainIndex = 0;
+  let interIndex = 0;
+  let mainCount = 0;
+  while (z < SCHEDULE_ROWS) {
+    const biome = BIOME_ORDER[mainIndex % BIOME_ORDER.length];
+    SEGMENTS.push({ start: z, end: z + BIOME_SPAN, biome, kind: "main" });
+    z += BIOME_SPAN;
+    mainIndex++;
+    mainCount++;
+    if (mainCount % MAIN_BIOMES_PER_INTERMEDIATE === 0) {
+      const interBiome = INTERMEDIATE_ORDER[interIndex % INTERMEDIATE_ORDER.length];
+      SEGMENTS.push({
+        start: z,
+        end: z + INTERMEDIATE_SPAN,
+        biome: interBiome,
+        kind: "intermediate"
+      });
+      z += INTERMEDIATE_SPAN;
+      interIndex++;
+    }
+  }
+}
+
+export function biomeSegmentAt(z: number): BiomeSegment {
+  if (z <= 0) return SEGMENTS[0];
+  let lo = 0;
+  let hi = SEGMENTS.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const segment = SEGMENTS[mid];
+    if (z < segment.start) hi = mid - 1;
+    else if (z >= segment.end) lo = mid + 1;
+    else return segment;
+  }
+  return SEGMENTS[SEGMENTS.length - 1];
+}
+
+/** Banks at the start, middle and end of flood/crossroads segments. */
+export function isSpecialBankRow(rel: number): boolean {
+  return rel <= 1 || (rel >= 5 && rel <= 6) || rel >= INTERMEDIATE_SPAN - 2;
 }
 
 export function biomeForZ(z: number): BiomeDef {
-  return BIOMES[BIOME_ORDER[biomeIndexForZ(z)]];
+  return BIOMES[biomeSegmentAt(z).biome];
 }
 
 export const BIOME_DESCRIPTIONS: Record<BiomeId, string> = {
@@ -892,6 +1089,9 @@ export const BIOME_DESCRIPTIONS: Record<BiomeId, string> = {
   candy: "Шоколадные реки и конфетный самолёт. Сладко и опасно.",
   prehistoric: "Стампида вместо поездов и птеродактиль. Слушай гул земли.",
   halloween: "Летучая мышь и туман. Не оглядывайся.",
+  storm: "Гроза: дождь, сумрак и ускоренный трафик. Держи ритм, не зевай.",
+  flood: "Половодье: вместо лужаек вода. Отдых только на островках.",
+  crossroads: "Перекрёсток: только дороги и светофоры. Переходи на красный.",
 };
 
 for (const biome of Object.values(BIOMES)) {
@@ -899,6 +1099,7 @@ for (const biome of Object.values(BIOMES)) {
 }
 
 export function biomeStartRow(biome: BiomeId): number {
-  return BIOME_ORDER.indexOf(biome) * BIOME_SPAN;
+  const segment = SEGMENTS.find((entry) => entry.biome === biome);
+  return segment?.start ?? 0;
 }
 

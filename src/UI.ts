@@ -23,6 +23,7 @@ const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) 
 export class UI {
   readonly refs = {
     hud: $("hud"),
+    weather: $("weather"),
     menu: $("menu"),
     pause: $("pauseScreen"),
     gameover: $("gameoverScreen"),
@@ -216,6 +217,7 @@ export class UI {
     this.setHidden(this.refs.newBestRibbon, true);
     this.hideTutorial();
     this.hideBiomeBanner();
+    this.setWeather(false);
     this.updateStats();
     this.renderSkinCards();
   }
@@ -253,6 +255,11 @@ export class UI {
   hideBiomeBanner(): void {
     window.clearTimeout(this.biomeBannerTimer);
     this.refs.biomeBanner.classList.remove("is-visible");
+  }
+
+  /** Storm intermediates add a rain overlay above the world, below the HUD. */
+  setWeather(storm: boolean): void {
+    this.refs.weather.classList.toggle("is-storm", storm);
   }
 
   showPlaying(): void {

@@ -148,6 +148,7 @@ export class Game {
 
   private announceBiome(): void {
     const biome = this.world.getBiome();
+    this.ui.setWeather(biome.mechanics?.storm === true);
     this.ui.showBiomeBanner(biome.name, biome.description ?? "");
   }
 
