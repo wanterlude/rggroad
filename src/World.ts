@@ -548,14 +548,16 @@ export class World {
     const row = this.blankRow(z, "grass");
     row.variant = Math.floor(this.rng() * 4);
     this.addDecor(row);
-    if (options.allowProps) this.addProps(row);
     const mechanics = this.mechanicsAt(z);
+    // Keep roller rows free of solid props: a log or tumbleweed crosses the
+    // whole lawn, and rolling through a tree trunk looks broken.
+    const rollerKind =
+      mechanics.rollers && this.mode !== "menu" && this.rng() < 0.36 ? mechanics.rollers : null;
+    if (options.allowProps && !rollerKind) this.addProps(row);
     if (mechanics.geysers && this.mode !== "menu" && this.rng() < 0.78) {
       this.addGeysers(row);
     }
-    if (mechanics.rollers && this.mode !== "menu" && this.rng() < 0.36) {
-      this.addRoller(row, mechanics.rollers);
-    }
+    if (rollerKind) this.addRoller(row, rollerKind);
     if (options.allowCoin) this.addCoin(row, 0.4, -3.8, 3.8);
     return row;
   }
