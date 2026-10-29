@@ -3,6 +3,8 @@
  * green theme; the table is kept as an internal palette source.
  */
 
+import { mulberry32 } from "./utils";
+
 export type BaseBiomeId =
   | "autumn"
   | "forest"
@@ -1031,6 +1033,8 @@ export interface BiomeSegment {
   end: number;
   biome: BiomeId;
   kind: "main" | "intermediate";
+  /** 0 = first cycle, 1+ = elite cycle (night, shuffled biome order). */
+  cycle: number;
 }
 
 // Precomputed run plan: main biomes of 30 rows with a short intermediate
@@ -1038,24 +1042,44 @@ export interface BiomeSegment {
 // even though segment lengths differ.
 const SCHEDULE_ROWS = 240_000;
 const SEGMENTS: BiomeSegment[] = [];
+
+function shuffledOrder(cycle: number): BiomeId[] {
+  const order = [...BIOME_ORDER];
+  const rng = mulberry32(0x5eed + cycle);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const swap = order[i];
+    order[i] = order[j];
+    order[j] = swap;
+  }
+  return order;
+}
+
 {
   let z = 0;
   let mainIndex = 0;
   let interIndex = 0;
   let mainCount = 0;
+  let cycle = 0;
+  let order = [...BIOME_ORDER];
   while (z < SCHEDULE_ROWS) {
-    const biome = BIOME_ORDER[mainIndex % BIOME_ORDER.length];
-    SEGMENTS.push({ start: z, end: z + BIOME_SPAN, biome, kind: "main" });
+    const biome = order[mainIndex % BIOME_ORDER.length];
+    SEGMENTS.push({ start: z, end: z + BIOME_SPAN, biome, kind: "main", cycle });
     z += BIOME_SPAN;
     mainIndex++;
     mainCount++;
+    if (mainIndex % BIOME_ORDER.length === 0) {
+      cycle++;
+      order = shuffledOrder(cycle);
+    }
     if (mainCount % MAIN_BIOMES_PER_INTERMEDIATE === 0) {
       const interBiome = INTERMEDIATE_ORDER[interIndex % INTERMEDIATE_ORDER.length];
       SEGMENTS.push({
         start: z,
         end: z + INTERMEDIATE_SPAN,
         biome: interBiome,
-        kind: "intermediate"
+        kind: "intermediate",
+        cycle
       });
       z += INTERMEDIATE_SPAN;
       interIndex++;

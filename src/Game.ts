@@ -46,6 +46,7 @@ export class Game {
   private demoBiomeCursor = 0;
   private lastBiomeBoundary = 0;
   private lastBiomeId = "";
+  private lastElite = false;
   private cameraSnap = true;
   private readonly camAnchor = new THREE.Vector3();
   private readonly envAnchor = new THREE.Vector3();
@@ -131,6 +132,8 @@ export class Game {
     this.debugRun = this.world.isDebugRun();
     this.lastBiomeBoundary = this.world.getNextBiomeBoundary();
     this.lastBiomeId = this.world.getBiome().id;
+    this.lastElite = this.world.getElite();
+    this.ui.setNight(this.lastElite);
     this.score = this.world.getScore();
     this.biomesVisited.clear();
     this.biomesVisited.add(this.lastBiomeId);
@@ -153,8 +156,9 @@ export class Game {
 
   private announceBiome(): void {
     const biome = this.world.getBiome();
+    const elite = this.world.getElite();
     this.ui.setWeather(biome.mechanics?.storm === true);
-    this.ui.showBiomeBanner(biome.name, biome.description ?? "");
+    this.ui.showBiomeBanner(elite ? `${biome.name} · НОЧЬ` : biome.name, biome.description ?? "");
   }
 
   private goMenu(): void {
@@ -577,9 +581,18 @@ export class Game {
         this.ui.fadeBiomeTransition();
       }
       const biomeId = this.world.getBiome().id;
+      const elite = this.world.getElite();
+      const eliteChanged = elite !== this.lastElite;
+      if (eliteChanged) {
+        this.lastElite = elite;
+        this.ui.setNight(elite);
+      }
       if (biomeId !== this.lastBiomeId) {
         this.lastBiomeId = biomeId;
         this.biomesVisited.add(biomeId);
+        this.ui.fadeBiomeTransition();
+        this.announceBiome();
+      } else if (eliteChanged) {
         this.ui.fadeBiomeTransition();
         this.announceBiome();
       }

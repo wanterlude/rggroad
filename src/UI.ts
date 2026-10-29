@@ -24,6 +24,7 @@ export class UI {
   readonly refs = {
     hud: $("hud"),
     weather: $("weather"),
+    night: $("night"),
     menu: $("menu"),
     pause: $("pauseScreen"),
     gameover: $("gameoverScreen"),
@@ -224,6 +225,7 @@ export class UI {
     this.hideBiomeBanner();
     this.hideMilestone();
     this.setWeather(false);
+    this.setNight(false);
     this.updateStats();
     this.renderSkinCards();
   }
@@ -266,6 +268,11 @@ export class UI {
   /** Storm intermediates add a rain overlay above the world, below the HUD. */
   setWeather(storm: boolean): void {
     this.refs.weather.classList.toggle("is-storm", storm);
+  }
+
+  /** Elite cycles run at night: a dark blue veil over the world. */
+  setNight(night: boolean): void {
+    this.refs.night.classList.toggle("is-night", night);
   }
 
   /** A 50-row milestone badge. */

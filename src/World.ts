@@ -343,6 +343,12 @@ export class World {
     return this.debugStart > 0 || this.forceBiomeId !== null;
   }
 
+  /** Elite cycles are after the first full pass through the 14 biomes. */
+  getElite(): boolean {
+    if (this.mode !== "run") return false;
+    return biomeSegmentAt(Math.max(0, this.player.z)).cycle > 0;
+  }
+
   getBiome() {
     return this.biomeAt(this.player.z);
   }
@@ -577,6 +583,10 @@ export class World {
       return segment.biome === "flood" ? "flood" : "crossroads";
     }
 
+    // Two safe rows at the start of every main biome, so a new world always
+    // begins with a short breather instead of a blind road.
+    if (segment.kind === "main" && z - segment.start < 2) return "bank";
+
     const r = this.rng();
     const d = clamp(z / 95, 0, 1);
     if (z < 6) return "road";
@@ -675,8 +685,9 @@ export class World {
     const width = Math.min(this.rng() < 0.34 ? 2 : 1, this.segmentRoom(z));
     const segment = biomeSegmentAt(z);
     const clearBank =
-      segment.kind === "intermediate" &&
-      (segment.biome === "flood" || segment.biome === "crossroads");
+      (segment.kind === "intermediate" &&
+        (segment.biome === "flood" || segment.biome === "crossroads")) ||
+      (segment.kind === "main" && z - segment.start < 2);
     for (let i = 0; i < width; i++) {
       this.attachRow(
         this.makeGrassRow(z + i, { allowProps: !clearBank, allowCoin: true })
