@@ -3472,6 +3472,20 @@ body.menu-active #game {
   font-size: 10px;
 }
 
+.dock-scroll-hint {
+  margin-left: 5px;
+  color: var(--yellow);
+  font-family: var(--body-font);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  opacity: 0.86;
+}
+
+.dock-scroll-hint[hidden] {
+  display: none;
+}
+
 .menu-screen .skin-rail {
   display: grid;
   grid-template-columns: repeat(var(--shelf-cols), minmax(0, 1fr));

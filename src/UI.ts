@@ -54,6 +54,7 @@ export class UI {
     skinRail: $("skinRail"),
     skinDock: $("skinDock"),
     skinCount: $("skinCount"),
+    skinScrollHint: $("skinScrollHint"),
     artModal: $("artModal"),
     artModalImg: $<HTMLImageElement>("artModalImg"),
     artModalTitle: $("artModalTitle"),
@@ -107,7 +108,11 @@ export class UI {
     refs.seasonChip.addEventListener("click", () => handlers.onSeason());
     refs.pauseSoundBtn.setAttribute("aria-pressed", "false");
     refs.pauseMusicBtn.setAttribute("aria-pressed", "false");
-    window.addEventListener("resize", () => this.positionArtworkCard());
+    window.addEventListener("resize", () => {
+      this.positionArtworkCard();
+      this.updateScrollHint();
+    });
+    refs.skinRail.addEventListener("scroll", () => this.updateScrollHint());
     refs.artModalClose.addEventListener("click", () => this.closeArtwork());
     refs.artModal.addEventListener("click", (event) => {
       if (event.target === refs.artModal) this.closeArtwork();
@@ -535,6 +540,14 @@ export class UI {
         rail.scrollTop += cardTop - railTop - 4;
       }
     }
+    requestAnimationFrame(() => this.updateScrollHint());
+  }
+
+  /** Show "ЛИСТАЙ ↓" only while the shelf has more rows below the fold. */
+  private updateScrollHint(): void {
+    const { skinRail: rail, skinScrollHint: hint } = this.refs;
+    const max = rail.scrollHeight - rail.clientHeight;
+    hint.hidden = max <= 2 || rail.scrollTop >= max - 2;
   }
 
   /** Scroll the shelf by one visible page; used by keyboard/QA helpers. */
