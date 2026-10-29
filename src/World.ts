@@ -1338,6 +1338,9 @@ export class World {
           log.x += log.dir * log.speed * dt;
           if (log.x - log.len * 0.5 > ref + HALF_SPAN) log.x -= FULL_SPAN;
           if (log.x + log.len * 0.5 < ref - HALF_SPAN) log.x += FULL_SPAN;
+        }
+        this.separateLogs(row);
+        for (const log of row.logs) {
           if (log.group) {
             log.group.position.x = log.x;
             const visual = log.group.userData.visual as THREE.Group | undefined;
@@ -1371,6 +1374,25 @@ export class World {
           if (this.mode !== "menu") this.die(next?.crocodile ? "crocodile" : "water");
         }
       }
+    }
+  }
+
+  /**
+   * Wrapping is per-log, so a log entering from one edge can occasionally
+   * overlap the last log at the other edge. Push the right-hand log forward
+   * until every pair has a visible water gap; this is cheap and keeps the
+   * wrap seamless.
+   */
+  private separateLogs(row: Row): void {
+    const logs = row.logs
+      .filter((log) => !log.lily)
+      .sort((a, b) => a.x - b.x);
+    for (let i = 1; i < logs.length; i++) {
+      const prev = logs[i - 1];
+      const log = logs[i];
+      const minLeft = prev.x + prev.len * 0.5 + 0.55;
+      const left = log.x - log.len * 0.5;
+      if (left < minLeft) log.x += minLeft - left;
     }
   }
 
