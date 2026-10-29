@@ -57,25 +57,24 @@ const hitboxes = await page.evaluate(() => ({
 }));
 await page.screenshot({ path: `${outDir}/hitboxes-forest.png` });
 
-const mobile = await browser.newContext({ viewport: { width: 390, height: 844 } });
-const mobilePage = await mobile.newPage();
-mobilePage.on("pageerror", (error) => errors.push("mobile: " + String(error.message)));
-await mobilePage.goto(base + "?season=halloween", { waitUntil: "networkidle" });
-await mobilePage.waitForFunction(() => window.__CR3D_READY__ === true, null, { timeout: 15000 });
-await mobilePage.waitForTimeout(900);
-await mobilePage.screenshot({ path: `${outDir}/menu-mobile.png` });
+// Reuse the same page for mobile: a second WebGL context can be refused on
+// headless CI after 17 screenshots, which used to stall the mobile pass.
+await page.setViewportSize({ width: 390, height: 844 });
+await page.goto(base + "?season=halloween", { waitUntil: "networkidle" });
+await page.waitForFunction(() => window.__CR3D_READY__ === true, null, { timeout: 15000 });
+await page.waitForTimeout(900);
+await page.screenshot({ path: `${outDir}/menu-mobile.png` });
 
 for (const biome of biomes) {
-  await mobilePage.goto(`${base}?biome=${biome}&row=20&start=1&bot=1&seed=7&season=none`, {
+  await page.goto(`${base}?biome=${biome}&row=20&start=1&bot=1&seed=7&season=none`, {
     waitUntil: "networkidle"
   });
-  await mobilePage.waitForFunction(() => window.__CR3D_READY__ === true, null, {
+  await page.waitForFunction(() => window.__CR3D_READY__ === true, null, {
     timeout: 15000
   });
-  await mobilePage.waitForTimeout(900);
-  await mobilePage.screenshot({ path: `${outDir}/${biome}-mobile.png` });
+  await page.waitForTimeout(900);
+  await page.screenshot({ path: `${outDir}/${biome}-mobile.png` });
 }
-await mobile.close();
 
 console.log(`Hitbox overlay: ${hitboxes.canvas ? "on" : "MISSING"} · ${hitboxes.debug}`);
 if (errors.length) {
