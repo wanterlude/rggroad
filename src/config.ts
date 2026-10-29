@@ -218,7 +218,7 @@ export const SKINS: Record<SkinId, SkinDef> = {
   },
   moryaka: {
     id: "moryaka",
-    name: "Моряка",
+    name: "itsMORIKO",
     cost: 0,
     style: "moryaka",
     badge: "Штурман",

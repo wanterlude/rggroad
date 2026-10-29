@@ -20,7 +20,7 @@
 
 Все четырнадцать героев открыты сразу:
 
-`Moryaka`, `SeverinaSoda`, `HiganBanBan`, `Ditoshey`, `Squimeh`, `Snezha_mrr`,
+`itsMORIKO`, `SeverinaSoda`, `HiganBanBan`, `Ditoshey`, `Squimeh`, `Snezha_mrr`,
 `Meowlody Note`, `Miliray Brick`, `Yuchii_Yu`, `Alaskanyan`, `aLySQuE`,
 `AmeliaLavert`, `Nyamuras`, `Knjazevdesu`.
 
@@ -63,7 +63,7 @@ npm run dev
 
 - `?coins=max` — выдать монеты для проверки магазина; то же из консоли:
   `CR3D.setCoins("max")`.
-- `?eyes=1`…`?eyes=20` — варианты глаз Moryaka.
+- `?eyes=1`…`?eyes=20` — варианты глаз itsMORIKO.
 - `?debug=1` — отладочная строка состояния.
 
 ## Сборка
