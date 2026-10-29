@@ -594,8 +594,8 @@ export function buildCoin(value: number): THREE.Group {
   back.rotation.y = Math.PI;
   group.add(back);
 
-  if (value === 3) {
-    group.scale.setScalar(1.24);
+  if (value > 1) {
+    group.scale.setScalar(1 + (value - 1) * 0.18);
   }
   return group;
 }

@@ -221,6 +221,7 @@ export class World {
   private readonly demoBiomeIndex: number;
   private maxZ = 0;
   private runCoins = 0;
+  private lastCoinZ = -99;
   private deathTime = 0;
   private deathBubbleTimer = 0;
   private shake = 0;
@@ -283,6 +284,7 @@ export class World {
       this.attachRow(row);
     }
     this.frontier = 2;
+    this.lastCoinZ = 2;
     this.generateAhead(35);
 
     // Debug launches (?row=) jump straight to a biome: generate up to the
@@ -614,7 +616,15 @@ export class World {
   }
 
   private addBankRow(z: number): void {
-    this.attachRow(this.makeGrassRow(z, { allowProps: false, allowCoin: true }));
+    const row = this.makeGrassRow(z, { allowProps: false, allowCoin: true });
+    if (!row.coin) {
+      const segment = biomeSegmentAt(z);
+      const rel = z - segment.start;
+      const firstOfBank =
+        segment.kind === "main" ? rel === 0 : rel === 0 || rel === 5 || rel === 10;
+      if (firstOfBank) this.addCoin(row, 1, -3.8, 3.8);
+    }
+    this.attachRow(row);
     this.frontier = z;
   }
 
@@ -724,7 +734,7 @@ export class World {
       this.addTarPit(row);
     }
     if (belt) this.addBelt(row);
-    if (options.allowCoin) this.addCoin(row, 0.4, -3.8, 3.8);
+    if (options.allowCoin) this.addCoin(row, 0.5, -3.8, 3.8);
     return row;
   }
 
@@ -978,9 +988,16 @@ export class World {
   }
 
   private addCoin(row: Row, chance: number, minX: number, maxX: number): void {
-    if (row.coin || this.rng() > chance) return;
+    if (row.coin) return;
+    // Pity cadence: never let a long stretch go without a coin. This matters
+    // most in river- and rail-heavy biomes, where few rows are eligible.
+    const forced = row.z - this.lastCoinZ >= 5;
+    if (!forced && this.rng() > chance) return;
     for (let attempt = 0; attempt < 5; attempt++) {
-      const x = Math.round(rr(this.rng, minX, maxX) * 2) / 2;
+      // Keep coins within one sidestep of the centre lane: later roads and
+      // rivers make wide detours expensive, so a wide spread reads as a
+      // disappearing income even when the spawn rate is fine.
+      const x = Math.round(rr(this.rng, minX * 0.58, maxX * 0.58) * 2) / 2;
       if (row.props.some((p) => p.collider && Math.abs(p.x - x) < 1.05)) continue;
       if (row.geysers?.some((g) => Math.abs(g.x - x) < 0.75)) continue;
       if (row.fragile?.some((tile) => Math.abs(tile.x - x) < 0.75)) continue;
@@ -992,10 +1009,16 @@ export class World {
         z: row.z,
         collected: false,
         phase: this.rng() * Math.PI * 2,
-        value: this.rng() < 0.07 ? 3 : 1
+        value: this.coinValue(row.z)
       };
+      this.lastCoinZ = row.z;
       return;
     }
+  }
+
+  /** Coins are worth more the deeper the run goes, so the income keeps up. */
+  private coinValue(z: number): number {
+    return 1 + Math.min(2, Math.floor(Math.max(0, z) / 200));
   }
 
   private makeRoadRow(z: number, dir: 1 | -1, speed: number, difficulty: number): Row {
@@ -1059,7 +1082,7 @@ export class World {
         stop: false
       };
     }
-    this.addCoin(row, 0.28, -3.9, 3.9);
+    this.addCoin(row, 0.36, -3.9, 3.9);
     return row;
   }
 
@@ -1120,6 +1143,7 @@ export class World {
       length: 9.4,
       phase: this.rng() * Math.PI * 2
     };
+    this.addCoin(row, 0.3, -3.9, 3.9);
     return row;
   }
 
