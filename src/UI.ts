@@ -68,6 +68,9 @@ export class UI {
 
   private toastTimer = 0;
   private newBestTimer = 0;
+  private wheelAccum = 0;
+  private wheelIdleTimer = 0;
+  private wheelIndex = -1;
   private tutorialUsed = false;
   private skinPointerId: number | null = null;
   private skinPointerStartX = 0;
@@ -106,9 +109,19 @@ export class UI {
       if (!delta) return;
       event.preventDefault();
       event.stopPropagation();
-      // Wheel up → right, wheel down → left, as requested.
-      rail.scrollLeft -= delta;
-      this.updateSkinNav();
+      // Wheel up → right, wheel down → left, as requested. The wheel steps
+      // through cards one at a time; high-resolution wheels send small deltas,
+      // so those accumulate first instead of being snapped straight back.
+      this.wheelAccum += delta;
+      window.clearTimeout(this.wheelIdleTimer);
+      this.wheelIdleTimer = window.setTimeout(() => {
+        this.wheelAccum = 0;
+        this.wheelIndex = -1;
+      }, 500);
+      if (Math.abs(this.wheelAccum) < 35) return;
+      const direction = this.wheelAccum < 0 ? 1 : -1;
+      this.wheelAccum = 0;
+      this.stepSkin(direction);
     }, { passive: false, capture: true });
     // Mouse and touch drag scrolling, without accidentally opening a card.
     refs.skinRail.addEventListener("pointerdown", (event) => {
@@ -116,6 +129,8 @@ export class UI {
       const rail = refs.skinRail;
       if (rail.scrollWidth <= rail.clientWidth + 2) return;
       this.suppressSkinClick = false;
+      this.wheelIndex = -1;
+      this.wheelAccum = 0;
       this.skinPointerId = event.pointerId;
       this.skinPointerStartX = event.clientX;
       this.skinPointerStartScroll = rail.scrollLeft;
@@ -410,16 +425,47 @@ export class UI {
     }
     const selectedCard = rail.querySelector<HTMLElement>(".char-card.is-selected");
     if (selectedCard) {
-      rail.scrollLeft = Math.max(0, selectedCard.offsetLeft - (rail.clientWidth - selectedCard.clientWidth) / 2);
+      rail.scrollLeft = Math.max(0, selectedCard.offsetLeft - 2);
     }
+    this.wheelIndex = -1;
+    this.wheelAccum = 0;
     this.updateSkinNav();
     requestAnimationFrame(() => this.updateSkinNav());
   }
 
   scrollSkin(direction: number): void {
     const rail = this.refs.skinRail;
+    this.wheelIndex = -1;
     rail.scrollBy({ left: direction * Math.max(rail.clientWidth * 0.78, 300), behavior: "smooth" });
     window.setTimeout(() => this.updateSkinNav(), 280);
+  }
+
+  /** Wheel step: move exactly one card in the requested direction. */
+  private stepSkin(direction: number): void {
+    const rail = this.refs.skinRail;
+    const cards = Array.from(rail.querySelectorAll<HTMLElement>(".char-card"));
+    if (cards.length === 0) return;
+    if (this.wheelIndex < 0) {
+      let nearest = 0;
+      let best = Number.POSITIVE_INFINITY;
+      cards.forEach((card, index) => {
+        const dist = Math.abs(card.offsetLeft - 2 - rail.scrollLeft);
+        if (dist < best) {
+          best = dist;
+          nearest = index;
+        }
+      });
+      this.wheelIndex = nearest;
+    }
+    this.wheelIndex = Math.max(0, Math.min(cards.length - 1, this.wheelIndex + direction));
+    const target = cards[this.wheelIndex];
+    const max = rail.scrollWidth - rail.clientWidth;
+    // Cards snap to the left edge, so their snap position is their offset
+    // inside the rail. Centring early cards would clamp them all to 0 and the
+    // wheel would appear stuck at the start of the list.
+    const left = Math.max(0, Math.min(max, target.offsetLeft - 2));
+    rail.scrollTo({ left, behavior: "smooth" });
+    window.setTimeout(() => this.updateSkinNav(), 300);
   }
 
   updateSkinNav(): void {

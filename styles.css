@@ -814,7 +814,7 @@ button:focus-visible {
   border-radius: 13px;
   background: rgba(255, 255, 255, 0.44);
   text-align: center;
-  scroll-snap-align: center;
+  scroll-snap-align: start;
   transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
 }
 
