@@ -401,6 +401,9 @@ export class Game {
         this.audio.trainHorn(event.volume);
       } else if (event.type === "geyser") {
         this.audio.geyser(event.volume);
+      } else if (event.type === "tide") {
+        this.audio.tide();
+        this.ui.showToast("ПРИЛИВ! Волна идёт следом", 1800);
       } else if (event.type === "eagle-warning") {
         this.ui.showEagleWarning(event.seconds);
         if (event.seconds > 0) this.audio.warning();
@@ -422,7 +425,7 @@ export class Game {
     this.ui.updateHUD(this.score);
     this.pointer = null;
 
-    if (event.cause === "water" || event.cause === "crocodile") {
+    if (event.cause === "water" || event.cause === "crocodile" || event.cause === "tide") {
       this.audio.splash();
       this.audio.deathTone();
     } else if (event.cause === "eagle") {

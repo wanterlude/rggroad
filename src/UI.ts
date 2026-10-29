@@ -315,7 +315,9 @@ export class UI {
                           ? "БОМ!"
                           : options.cause === "beast"
                             ? "ТОП!"
-                            : "БУМ!";
+                            : options.cause === "tide"
+                              ? "ВОЛНА!"
+                              : "БУМ!";
     const message =
       options.cause === "water"
         ? "Бревно уплыло. В следующий раз прыгай точнее."
@@ -339,7 +341,9 @@ export class UI {
                           ? "Кокос свалился на голову. Тень растёт — уходи с клетки."
                           : options.cause === "beast"
                             ? "Стадо несётся через саванну. Пережди волну."
-                            : "Машины не тормозят. Проверь оба ряда.";
+                            : options.cause === "tide"
+                              ? "Прилив догнал. Не отставай — волна идёт следом."
+                              : "Машины не тормозят. Проверь оба ряда.";
     this.refs.overTitle.textContent = title;
     this.refs.overMessage.textContent = message;
     this.refs.finalScore.textContent = fmt(options.score);

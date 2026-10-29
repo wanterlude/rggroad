@@ -4,7 +4,7 @@ import type { BiomeDecorKind, BiomeId, BiomePropKind } from "./biomes";
 
 export type GameState = "menu" | "playing" | "paused" | "dying" | "gameover";
 export type RowType = "grass" | "road" | "water" | "rail";
-export type DeathCause = "car" | "train" | "water" | "eagle" | "crocodile" | "geyser" | "log" | "tumble" | "void" | "ghost" | "coconut" | "beast";
+export type DeathCause = "car" | "train" | "water" | "eagle" | "crocodile" | "geyser" | "log" | "tumble" | "void" | "ghost" | "coconut" | "beast" | "tide";
 
 export interface SaveData {
   best: number;
@@ -245,4 +245,5 @@ export type GameEvent =
   | { type: "horn"; volume: number }
   | { type: "eagle-warning"; seconds: number }
   | { type: "geyser"; volume: number }
+  | { type: "tide" }
   | { type: "death"; cause: DeathCause; score: number; coins: number };

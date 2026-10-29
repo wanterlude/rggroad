@@ -100,6 +100,12 @@ const FRAGILE_GONE_SECONDS = 3.2;
 const FALLER_WARN_SECONDS = 1.2;
 const FALLER_FALL_SECONDS = 0.3;
 const FALLER_IMPACT_SECONDS = 0.35;
+// Ocean tide: a wave starts behind the hero and rolls forward for a few seconds.
+const TIDE_FIRST_DELAY = 4;
+const TIDE_GAP = 9;
+const TIDE_START_BEHIND = 9;
+const TIDE_SPEED = 2.2;
+const TIDE_LIFE = 7;
 // City traffic cycle: green -> amber -> red.
 const LIGHT_GREEN_SECONDS = 4.4;
 const LIGHT_AMBER_SECONDS = 0.8;
@@ -201,6 +207,11 @@ export class World {
   private readonly rows = new Map<number, Row>();
   private readonly playerGroup: THREE.Group;
   private readonly shadow: THREE.Mesh;
+  private readonly tideGroup: THREE.Group;
+  private tideActive = false;
+  private tideTimer = TIDE_FIRST_DELAY;
+  private tideAge = 0;
+  private tideZ = 0;
   private frontier = 4;
   private back = -38;
   private time = 0;
@@ -319,6 +330,7 @@ export class World {
     this.playerGroup.position.set(this.player.x, 0, this.player.z);
     this.root.add(this.playerGroup);
     this.shadow.visible = true;
+    this.tideGroup = this.buildTideWave();
     this.syncPlayerVisual(0);
   }
 
@@ -398,6 +410,7 @@ export class World {
       this.idleHazard = null;
     }
     this.root.remove(this.playerGroup);
+    this.root.remove(this.tideGroup);
     this.shadow.visible = false;
   }
 
@@ -1140,6 +1153,7 @@ export class World {
     this.updateGeysers(dt, time);
     this.updateFragile(dt, time);
     this.updateFallers(dt, time);
+    this.updateTide(dt);
     this.updateIdleHazard(dt);
     this.updateCoins(time);
     this.updateLeafPiles();
@@ -1551,6 +1565,104 @@ export class World {
         if (belt.texture) belt.texture.offset.x -= belt.dir * belt.speed * dt * 0.55;
       }
     }
+  }
+
+  private buildTideWave(): THREE.Group {
+    const group = new THREE.Group();
+    const base = new THREE.Mesh(
+      new THREE.BoxGeometry(46, 0.9, 0.8),
+      new THREE.MeshLambertMaterial({ color: 0x1d7f9a })
+    );
+    base.position.y = 0.45;
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(46, 0.7, 0.9),
+      new THREE.MeshLambertMaterial({ color: 0x2fa8c8 })
+    );
+    body.position.y = 1.15;
+    const foam = new THREE.Mesh(
+      new THREE.BoxGeometry(46, 0.16, 1),
+      new THREE.MeshLambertMaterial({ color: 0xdcfaff })
+    );
+    foam.position.y = 1.55;
+    group.add(base, body, foam);
+    const foamGeometry = new THREE.BoxGeometry(0.7, 0.25, 0.5);
+    const foamMaterial = new THREE.MeshLambertMaterial({ color: 0xeaffff });
+    for (let i = 0; i < 20; i++) {
+      const crest = new THREE.Mesh(foamGeometry, foamMaterial);
+      crest.position.set(
+        -23 + i * 2.4 + Math.random() * 0.6,
+        1.64 + Math.random() * 0.3,
+        (Math.random() - 0.5) * 0.6
+      );
+      crest.scale.set(0.8 + Math.random() * 0.7, 0.6 + Math.random() * 0.9, 0.8 + Math.random() * 0.5);
+      crest.rotation.z = (Math.random() - 0.5) * 0.4;
+      group.add(crest);
+    }
+    group.visible = false;
+    this.root.add(group);
+    return group;
+  }
+
+  private updateTide(dt: number): void {
+    if (this.mode !== "run") {
+      if (this.tideActive) this.hideTide();
+      return;
+    }
+    const isOcean = this.mechanicsAt(this.player.z).tide === true;
+    if (!isOcean) {
+      if (this.tideActive) this.hideTide();
+      this.tideTimer = TIDE_FIRST_DELAY;
+      return;
+    }
+
+    if (!this.tideActive) {
+      this.tideTimer -= dt;
+      if (this.tideTimer <= 0) {
+        this.tideActive = true;
+        this.tideAge = 0;
+        this.tideZ = this.player.z - TIDE_START_BEHIND;
+        this.tideGroup.position.z = this.tideZ;
+        this.tideGroup.visible = true;
+        this.events.push({ type: "tide" });
+      }
+      return;
+    }
+
+    this.tideAge += dt;
+    this.tideZ += TIDE_SPEED * dt;
+    this.tideGroup.position.z = this.tideZ;
+    if (Math.random() < dt * 10) {
+      this.sceneView.particles.spawn({
+        x: (Math.random() - 0.5) * 34,
+        y: 1.2,
+        z: this.tideZ + (Math.random() - 0.5) * 0.4,
+        vx: (Math.random() - 0.5) * 0.6,
+        vy: 1 + Math.random() * 1.4,
+        vz: 0.4 + Math.random() * 0.8,
+        gravity: 4,
+        life: 0.4 + Math.random() * 0.3,
+        size: 0.06 + Math.random() * 0.08,
+        color: Math.random() < 0.5 ? 0xdcfaff : 0x8be1f4,
+        spin: 5
+      });
+    }
+    if (!this.player.dead && Math.abs(this.player.z - this.tideZ) < 0.7) {
+      this.die("tide");
+      return;
+    }
+    if (
+      this.tideAge > TIDE_LIFE ||
+      this.tideZ > this.player.z + 12 ||
+      this.tideZ < this.player.z - 26
+    ) {
+      this.hideTide();
+    }
+  }
+
+  private hideTide(): void {
+    this.tideActive = false;
+    this.tideTimer = TIDE_GAP;
+    this.tideGroup.visible = false;
   }
 
   private updateFragile(dt: number, time: number): void {    if (this.mode === "menu") return;
@@ -2163,6 +2275,14 @@ export class World {
     this.demoMoveTimer -= dt;
     if (this.demoMoveTimer > 0) return;
 
+    // The tide is right behind: run forward even if the planner wanted to wait.
+    if (this.tideActive && this.tideZ > this.player.z - 5) {
+      if (this.tryMove(0, 1)) {
+        this.demoMoveTimer = 0.1;
+        return;
+      }
+    }
+
     // A log or tumbleweed is about to reach the hero: sidestep it first.
     const here = this.rows.get(Math.round(p.z));
     const threat = here?.rollers?.find((roller) => Math.abs(roller.x - p.x) < 2.1);
@@ -2457,7 +2577,7 @@ export class World {
     p.queued = null;
     this.events.push({ type: "death", cause, score: this.maxZ, coins: this.runCoins });
 
-    if (cause === "water") {
+    if (cause === "water" || cause === "tide") {
       this.shake = Math.max(this.shake, 0.45);
       this.sceneView.particles.burstSplash(p.x, p.z);
       this.shadow.visible = false;

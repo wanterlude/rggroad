@@ -227,6 +227,11 @@ export class AudioEngine {
     this.tone({ frequency: 92, endFrequency: 52, duration: 0.32, type: "sawtooth", volume: level * 0.55 });
   }
 
+  tide(): void {
+    this.noise({ duration: 0.7, volume: 0.11, filterType: "lowpass", frequency: 220, endFrequency: 80 });
+    this.tone({ frequency: 72, endFrequency: 44, duration: 0.8, type: "sine", volume: 0.06 });
+  }
+
   splash(): void {
     this.noise({ duration: 0.34, volume: 0.14, filterType: "bandpass", frequency: 1500, endFrequency: 260, q: 0.7 });
     this.tone({ frequency: 420, endFrequency: 120, duration: 0.24, type: "sine", volume: 0.055 });
