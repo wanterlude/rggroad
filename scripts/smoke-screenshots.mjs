@@ -14,7 +14,13 @@ const biomes = [
 const browser = await chromium.launch({
   headless: true,
   executablePath: process.env.CHROME_PATH || undefined,
-  args: ["--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
+  args: [
+    "--no-sandbox",
+    "--use-gl=angle",
+    "--use-angle=swiftshader",
+    "--enable-unsafe-swiftshader",
+    "--ignore-gpu-blocklist"
+  ]
 });
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await context.newPage();
@@ -26,7 +32,7 @@ page.on("console", (message) => {
 
 const boot = async (path) => {
   await page.goto(base + path, { waitUntil: "networkidle" });
-  await page.waitForFunction(() => window.__CR3D_READY__ === true, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.__CR3D_READY__ === true, null, { timeout: 15000 });
   await page.waitForTimeout(1100);
 };
 
@@ -55,7 +61,7 @@ const mobile = await browser.newContext({ viewport: { width: 390, height: 844 } 
 const mobilePage = await mobile.newPage();
 mobilePage.on("pageerror", (error) => errors.push("mobile: " + String(error.message)));
 await mobilePage.goto(base + "?season=halloween", { waitUntil: "networkidle" });
-await mobilePage.waitForFunction(() => window.__CR3D_READY__ === true, null, { timeout: 30000 });
+await mobilePage.waitForFunction(() => window.__CR3D_READY__ === true, null, { timeout: 15000 });
 await mobilePage.waitForTimeout(900);
 await mobilePage.screenshot({ path: `${outDir}/menu-mobile.png` });
 
@@ -64,7 +70,7 @@ for (const biome of biomes) {
     waitUntil: "networkidle"
   });
   await mobilePage.waitForFunction(() => window.__CR3D_READY__ === true, null, {
-    timeout: 30000
+    timeout: 15000
   });
   await mobilePage.waitForTimeout(900);
   await mobilePage.screenshot({ path: `${outDir}/${biome}-mobile.png` });
