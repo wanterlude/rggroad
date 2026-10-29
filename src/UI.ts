@@ -53,8 +53,7 @@ export class UI {
     seasonChipLabel: $("seasonChipLabel"),
     skinRail: $("skinRail"),
     skinDock: $("skinDock"),
-    skinPrev: $<HTMLButtonElement>("skinPrev"),
-    skinNext: $<HTMLButtonElement>("skinNext"),
+    skinCount: $("skinCount"),
     artModal: $("artModal"),
     artModalImg: $<HTMLImageElement>("artModalImg"),
     artModalTitle: $("artModalTitle"),
@@ -89,15 +88,7 @@ export class UI {
   private newBestTimer = 0;
   private biomeBannerTimer = 0;
   private milestoneTimer = 0;
-  private wheelAccum = 0;
-  private wheelIdleTimer = 0;
-  private wheelIndex = -1;
   private tutorialUsed = false;
-  private skinPointerId: number | null = null;
-  private skinPointerStartX = 0;
-  private skinPointerStartScroll = 0;
-  private skinDragging = false;
-  private suppressSkinClick = false;
 
   constructor(private handlers: UIHandlers) {
     const { refs } = this;
@@ -116,88 +107,7 @@ export class UI {
     refs.seasonChip.addEventListener("click", () => handlers.onSeason());
     refs.pauseSoundBtn.setAttribute("aria-pressed", "false");
     refs.pauseMusicBtn.setAttribute("aria-pressed", "false");
-    refs.skinPrev.addEventListener("click", () => this.scrollSkin(-1));
     window.addEventListener("resize", () => this.positionArtworkCard());
-    refs.skinNext.addEventListener("click", () => this.scrollSkin(1));
-    refs.skinRail.addEventListener("scroll", () => this.updateSkinNav());
-    // Capture wheel events globally: the menu has no vertical scroll, so a
-    // wheel over the hero dock always moves the rail horizontally.
-    window.addEventListener("wheel", (event) => {
-      const rail = refs.skinRail;
-      if (rail.scrollWidth <= rail.clientWidth + 2) return;
-      const rect = refs.skinDock.getBoundingClientRect();
-      const inside = event.clientX >= rect.left && event.clientX <= rect.right &&
-        event.clientY >= rect.top && event.clientY <= rect.bottom;
-      if (!inside) return;
-      const delta = (Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX) *
-        (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rail.clientWidth : 1);
-      if (!delta) return;
-      event.preventDefault();
-      event.stopPropagation();
-      // Wheel up → right, wheel down → left, as requested. The wheel steps
-      // through cards one at a time; high-resolution wheels send small deltas,
-      // so those accumulate first instead of being snapped straight back.
-      this.wheelAccum += delta;
-      window.clearTimeout(this.wheelIdleTimer);
-      this.wheelIdleTimer = window.setTimeout(() => {
-        this.wheelAccum = 0;
-        this.wheelIndex = -1;
-      }, 500);
-      if (Math.abs(this.wheelAccum) < 35) return;
-      const direction = this.wheelAccum < 0 ? 1 : -1;
-      this.wheelAccum = 0;
-      this.stepSkin(direction);
-    }, { passive: false, capture: true });
-    // Mouse and touch drag scrolling, without accidentally opening a card.
-    refs.skinRail.addEventListener("pointerdown", (event) => {
-      if (event.pointerType === "mouse" && event.button !== 0) return;
-      const rail = refs.skinRail;
-      if (rail.scrollWidth <= rail.clientWidth + 2) return;
-      this.suppressSkinClick = false;
-      this.wheelIndex = -1;
-      this.wheelAccum = 0;
-      this.skinPointerId = event.pointerId;
-      this.skinPointerStartX = event.clientX;
-      this.skinPointerStartScroll = rail.scrollLeft;
-      this.skinDragging = false;
-    });
-
-    refs.skinRail.addEventListener("pointermove", (event) => {
-      if (this.skinPointerId !== event.pointerId) return;
-      const rail = refs.skinRail;
-      const dx = event.clientX - this.skinPointerStartX;
-      if (!this.skinDragging && Math.abs(dx) > 6) {
-        this.skinDragging = true;
-        rail.classList.add("is-dragging");
-        try { rail.setPointerCapture(event.pointerId); } catch { /* pointer capture is optional */ }
-      }
-      if (!this.skinDragging) return;
-      event.preventDefault();
-      rail.scrollLeft = this.skinPointerStartScroll - dx;
-      this.updateSkinNav();
-    });
-
-    const finishSkinDrag = (event: PointerEvent) => {
-      if (this.skinPointerId !== event.pointerId) return;
-      const rail = refs.skinRail;
-      if (this.skinDragging) {
-        this.suppressSkinClick = true;
-        this.skinDragging = false;
-        rail.classList.remove("is-dragging");
-        window.setTimeout(() => { this.suppressSkinClick = false; }, 80);
-      }
-      this.skinPointerId = null;
-    };
-    refs.skinRail.addEventListener("pointerup", finishSkinDrag);
-    refs.skinRail.addEventListener("pointercancel", finishSkinDrag);
-    window.addEventListener("pointerup", finishSkinDrag);
-    window.addEventListener("pointercancel", finishSkinDrag);
-    refs.skinRail.addEventListener("click", (event) => {
-      if (!this.suppressSkinClick) return;
-      event.preventDefault();
-      event.stopPropagation();
-      this.suppressSkinClick = false;
-    }, true);
     refs.artModalClose.addEventListener("click", () => this.closeArtwork());
     refs.artModal.addEventListener("click", (event) => {
       if (event.target === refs.artModal) this.closeArtwork();
@@ -517,6 +427,7 @@ export class UI {
       ...save.data.favorites.filter((id) => SKIN_ORDER.includes(id)),
       ...SKIN_ORDER.filter((id) => !favorites.has(id))
     ];
+    this.refs.skinCount.textContent = String(order.length);
 
     for (const key of order) {
       const skin = SKINS[key];
@@ -617,58 +528,19 @@ export class UI {
       `.char-card[data-skin="${targetSkin}"]`
     );
     if (focus) {
-      rail.scrollLeft = Math.max(0, focus.offsetLeft - 2);
+      const railTop = rail.getBoundingClientRect().top;
+      const cardTop = focus.getBoundingClientRect().top;
+      const cardBottom = cardTop + focus.offsetHeight;
+      if (cardTop < railTop || cardBottom > railTop + rail.clientHeight) {
+        rail.scrollTop += cardTop - railTop - 4;
+      }
     }
-    this.wheelIndex = -1;
-    this.wheelAccum = 0;
-    this.updateSkinNav();
-    requestAnimationFrame(() => this.updateSkinNav());
   }
 
+  /** Scroll the shelf by one visible page; used by keyboard/QA helpers. */
   scrollSkin(direction: number): void {
     const rail = this.refs.skinRail;
-    this.wheelIndex = -1;
-    rail.scrollBy({ left: direction * Math.max(rail.clientWidth * 0.78, 300), behavior: "smooth" });
-    window.setTimeout(() => this.updateSkinNav(), 280);
-  }
-
-  /** Wheel step: move exactly one card in the requested direction. */
-  private stepSkin(direction: number): void {
-    const rail = this.refs.skinRail;
-    const cards = Array.from(rail.querySelectorAll<HTMLElement>(".char-card"));
-    if (cards.length === 0) return;
-    if (this.wheelIndex < 0) {
-      let nearest = 0;
-      let best = Number.POSITIVE_INFINITY;
-      cards.forEach((card, index) => {
-        const dist = Math.abs(card.offsetLeft - 2 - rail.scrollLeft);
-        if (dist < best) {
-          best = dist;
-          nearest = index;
-        }
-      });
-      this.wheelIndex = nearest;
-    }
-    this.wheelIndex = Math.max(0, Math.min(cards.length - 1, this.wheelIndex + direction));
-    const target = cards[this.wheelIndex];
-    const max = rail.scrollWidth - rail.clientWidth;
-    // Cards snap to the left edge, so their snap position is their offset
-    // inside the rail. Centring early cards would clamp them all to 0 and the
-    // wheel would appear stuck at the start of the list.
-    const left = Math.max(0, Math.min(max, target.offsetLeft - 2));
-    rail.scrollTo({ left, behavior: "smooth" });
-    window.setTimeout(() => this.updateSkinNav(), 300);
-  }
-
-  updateSkinNav(): void {
-    const { skinRail: rail, skinPrev, skinNext } = this.refs;
-    const overflow = rail.scrollWidth > rail.clientWidth + 2;
-    skinPrev.hidden = !overflow;
-    skinNext.hidden = !overflow;
-    if (!overflow) return;
-    const max = rail.scrollWidth - rail.clientWidth;
-    skinPrev.disabled = rail.scrollLeft <= 2;
-    skinNext.disabled = rail.scrollLeft >= max - 2;
+    rail.scrollBy({ top: direction * rail.clientHeight, behavior: "smooth" });
   }
 
   openArtwork(key: SkinId): void {
