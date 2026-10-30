@@ -20,6 +20,7 @@ import {
   biomeSegmentAt,
   BIOMES,
   BIOME_ORDER,
+  BIOME_SPAN,
   INTERMEDIATE_SPAN,
   isSpecialBankRow,
   type BiomeDecorKind,
@@ -456,7 +457,25 @@ export class World {
   }
 
   private targetAt(z: number): number {
-    return BIOME_TARGET[this.biomeAt(z).id] ?? 4;
+    const biome = this.biomeAt(z);
+    const target = BIOME_TARGET[biome.id] ?? 4;
+    // Practice and demo stay on one flat target. In a real run the short
+    // 30-row biomes ramp locally: start at the previous segment's pressure
+    // and reach this biome's target by its end, so difficulty still moves
+    // even though the player crosses only a handful of rows.
+    if (this.forceBiomeId) {
+      const t = clamp(z / BIOME_SPAN, 0, 1);
+      const smooth = t * t * (3 - 2 * t);
+      return target * (0.55 + 0.45 * smooth);
+    }
+    if (this.mode !== "run") return target;
+    const segment = biomeSegmentAt(z);
+    const span = Math.max(1, segment.end - segment.start);
+    const t = clamp((z - segment.start) / span, 0, 1);
+    const smooth = t * t * (3 - 2 * t);
+    const previous =
+      segment.start > 0 ? BIOME_TARGET[biomeSegmentAt(segment.start - 1).biome] : target * 0.55;
+    return previous + (target - previous) * smooth;
   }
 
   private riskAt(z: number): number {
@@ -467,13 +486,39 @@ export class World {
     return HAZARD_TUNE[this.biomeAt(z).id] ?? 1;
   }
 
-  private pressureAt(z: number): number {
-    return (0.2 + this.riskAt(z) * 3.7) * this.tuneAt(z);
+  private basePressure(biome: BiomeId): number {
+    const target = BIOME_TARGET[biome] ?? 4;
+    return (0.2 + (target / 100) * 3.7) * (HAZARD_TUNE[biome] ?? 1);
   }
 
-  /** 0 at the bank, 1 after row 95, multiplied by the biome target. */
+  /**
+   * Pressure is smoothed separately from target because HAZARD_TUNE differs
+   * sharply between neighbouring biomes. Interpolating the final pressure
+   * keeps the curve continuous across a biome border.
+   */
+  private pressureAt(z: number): number {
+    const base = this.basePressure(this.biomeAt(z).id);
+    if (this.forceBiomeId) {
+      const t = clamp(z / BIOME_SPAN, 0, 1);
+      const smooth = t * t * (3 - 2 * t);
+      return base * (0.55 + 0.45 * smooth);
+    }
+    if (this.mode !== "run") return base;
+    const segment = biomeSegmentAt(z);
+    const span = Math.max(1, segment.end - segment.start);
+    const t = clamp((z - segment.start) / span, 0, 1);
+    const smooth = t * t * (3 - 2 * t);
+    const current = this.basePressure(segment.biome);
+    const previous =
+      segment.start > 0
+        ? this.basePressure(biomeSegmentAt(segment.start - 1).biome)
+        : current * 0.55;
+    return previous + (current - previous) * smooth;
+  }
+
+  /** The pressure curve already contains the local 30-row ramp. */
   private difficultyAt(z: number): number {
-    return clamp(z / 95, 0, 1) * this.pressureAt(z);
+    return this.pressureAt(z);
   }
 
   getScore(): number {
