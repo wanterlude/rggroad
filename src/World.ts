@@ -140,6 +140,8 @@ const EAGLE_WARNING_SECONDS = 10;
 const PLAYER_X_LIMIT = 30;
 /** How far trees, rocks and decorative props may spread across a row. */
 const PROP_SPAN = 30;
+/** Hazard cells span the visible grass strip, not only the middle lanes. */
+const HAZARD_LANE_RADIUS = PLAYER_X_LIMIT;
 // Geyser cycle: calm -> glowing warning (1.5 s) -> eruption (0.7 s) -> calm.
 const GEYSER_WARN_SECONDS = 1.5;
 const GEYSER_ERUPT_SECONDS = 0.7;
@@ -842,9 +844,16 @@ export class World {
     return row;
   }
 
+  /** Integer cells across the visible row, so hazards are not centre-only. */
+  private hazardLanes(): number[] {
+    const lanes: number[] = [];
+    for (let x = -HAZARD_LANE_RADIUS; x <= HAZARD_LANE_RADIUS; x++) lanes.push(x);
+    return lanes;
+  }
+
   private addLeafPiles(row: Row): void {
     const count = this.rng() < 0.6 ? 1 : 2;
-    const lane = [-3, -2, -1, 0, 1, 2, 3];
+    const lane = this.hazardLanes();
     this.shuffleLane(lane);
     const piles: LeafPileData[] = [];
     for (const x of lane) {
@@ -860,7 +869,7 @@ export class World {
   private addTarPit(row: Row): void {
     const count =
       (this.rng() < 0.65 ? 1 : 2) + Math.floor(this.riskAt(row.z) * 7 * this.tuneAt(row.z));
-    const lane = [-3, -2, -1, 0, 1, 2, 3];
+    const lane = this.hazardLanes();
     this.shuffleLane(lane);
     const pits: TarPitData[] = [];
     for (const x of lane) {
@@ -876,7 +885,7 @@ export class World {
   private addSinkholes(row: Row): void {
     const count =
       (this.rng() < 0.7 ? 1 : 2) + Math.floor(this.riskAt(row.z) * 5 * this.tuneAt(row.z));
-    const lanes = [-3, -2, -1, 0, 1, 2, 3];
+    const lanes = this.hazardLanes();
     this.shuffleLane(lanes);
     const holes: SinkholeData[] = [];
     for (const x of lanes) {
@@ -949,7 +958,7 @@ export class World {
     const count =
       (this.rng() < 0.6 ? 1 : 2) +
       Math.floor(this.riskAt(row.z) * 5 * this.tuneAt(row.z));
-    const lane = [-3, -2, -1, 0, 1, 2, 3];
+    const lane = this.hazardLanes();
     for (let i = lane.length - 1; i > 0; i--) {
       const j = Math.floor(this.rng() * (i + 1));
       const swap = lane[i];
@@ -1006,7 +1015,7 @@ export class World {
     const count =
       (this.rng() < 0.55 ? 1 : 2) +
       Math.floor(this.riskAt(row.z) * 8 * this.tuneAt(row.z));
-    const lane = [-3, -2, -1, 0, 1, 2, 3];
+    const lane = this.hazardLanes();
     for (let i = lane.length - 1; i > 0; i--) {
       const j = Math.floor(this.rng() * (i + 1));
       const swap = lane[i];
