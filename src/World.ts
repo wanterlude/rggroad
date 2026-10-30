@@ -767,7 +767,7 @@ export class World {
   private addRoadSegment(z: number): void {
     const d = this.difficultyAt(z);
     const width = Math.min(
-      clamp(1 + Math.floor(this.rng() * (1.45 + d * 2.2)), 1, 3),
+      clamp(1 + Math.floor(this.rng() * (1.45 + d * 2.2)), 1, 4),
       this.segmentRoom(z)
     );
     const baseDir: 1 | -1 = this.rng() < 0.5 ? 1 : -1;
@@ -777,7 +777,7 @@ export class World {
         rr(this.rng, 1.9, 3.2) *
         (1 + d * 0.62) *
         this.mechanicsAt(z + i).speed;
-      this.attachRow(this.makeRoadRow(z + i, dir, speed, d));
+      this.attachRow(this.makeRoadRow(z + i, dir, speed, d, i, width));
     }
     this.frontier = z + width - 1;
     this.addSpacer(z + width);
@@ -1230,7 +1230,14 @@ export class World {
     return 1 + Math.min(2, Math.floor(Math.max(0, z) / 200));
   }
 
-  private makeRoadRow(z: number, dir: 1 | -1, speed: number, difficulty: number): Row {
+  private makeRoadRow(
+    z: number,
+    dir: 1 | -1,
+    speed: number,
+    difficulty: number,
+    laneIndex = 0,
+    laneCount = 1
+  ): Row {
     const row = this.blankRow(z, "road");
     const biome = BIOMES[row.biome];
     row.dir = dir;
@@ -1268,9 +1275,12 @@ export class World {
         cargo: pick(this.rng, [biome.shell, biome.rockLight, 0xe9edf0, color]),
         police
       });
+      const runBonus = (laneCount - 1) * 0.25 + laneIndex * 0.8;
       const spacing =
-        Math.max(4.6, rr(this.rng, 5.8, 10.2) - difficulty * 1.4) +
-        rr(this.rng, 0, 1.4);
+        Math.max(
+          4.6 + runBonus,
+          rr(this.rng, 5.8, 10.2) - difficulty * 1.4 + laneIndex * 0.6
+        ) + rr(this.rng, 0, 1.4);
       cursor += len + spacing;
     }
     if (row.cars.length === 0) {
