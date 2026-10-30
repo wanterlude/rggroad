@@ -14,7 +14,7 @@ const defaults: SaveData = {
   favorites: [],
   muted: false,
   musicMuted: false,
-  musicVolume: 0.5,
+  musicVolume: 0.05,
   runs: 0,
   economyVersion: ECONOMY_VERSION
 };

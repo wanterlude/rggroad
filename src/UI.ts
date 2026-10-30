@@ -541,7 +541,7 @@ export class UI {
     this.refs.bestValue.textContent = fmt(save.data.best);
   }
 
-  updateSoundUI(muted: boolean, musicMuted: boolean, musicVolume = 0.5): void {
+  updateSoundUI(muted: boolean, musicMuted: boolean, musicVolume = 0.05): void {
     const soundLabel = muted ? "ЗВУКИ ВЫКЛ" : "ЗВУКИ ВКЛ";
     const musicLabel = musicMuted ? "МУЗЫКА ВЫКЛ" : "МУЗЫКА ВКЛ";
     this.refs.menuSoundLabel.textContent = soundLabel;
