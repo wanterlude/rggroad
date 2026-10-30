@@ -2,6 +2,7 @@ import { clamp } from "./utils";
 import { save } from "./save";
 import type { BiomeId } from "./biomes";
 import { MENU_THEME } from "./assets/music/menuTheme";
+import { BIOME_TRACK_IDS } from "./music/tracks";
 
 type Bus = "sfx" | "music";
 
@@ -75,8 +76,17 @@ export class AudioEngine {
   private sfxGain: GainNode | null = null;
   private musicGain: GainNode | null = null;
   private menuGain: GainNode | null = null;
+  private biomeGain: GainNode | null = null;
   private menuBuffer: AudioBuffer | null = null;
   private menuSource: AudioBufferSourceNode | null = null;
+  private menuSourceGain: GainNode | null = null;
+  private biomeSource: AudioBufferSourceNode | null = null;
+  private biomeSourceGain: GainNode | null = null;
+  private biomeBuffer: BiomeId | null = null;
+  private trackCache = new Map<BiomeId, AudioBuffer>();
+  private trackRequests = new Map<BiomeId, Promise<AudioBuffer | null>>();
+  private trackToken = 0;
+  private preloading = false;
   private menuMode = true;
   private menuLoading = false;
   private musicDucked = false;
@@ -125,6 +135,10 @@ export class AudioEngine {
       this.menuGain = ctx.createGain();
       this.menuGain.gain.value = this.musicMuted ? 0 : this.musicVolume;
       this.menuGain.connect(this.master);
+
+      this.biomeGain = ctx.createGain();
+      this.biomeGain.gain.value = this.musicMuted ? 0 : this.musicVolume;
+      this.biomeGain.connect(this.master);
 
       this.noiseBuffer = this.makeNoise(ctx);
       this.ready = true;
@@ -195,12 +209,17 @@ export class AudioEngine {
     if (!this.musicGain || !this.ctx) return;
     const procedural = (this.musicMuted ? 0 : this.musicDucked ? 0.16 : 0.42) * this.musicVolume;
     const menu = this.musicMuted ? 0 : (this.musicDucked ? 0.35 : 1) * this.musicVolume;
+    const biome = this.musicMuted ? 0 : (this.musicDucked ? 0.3 : 1) * this.musicVolume;
     const now = this.ctx.currentTime;
     this.musicGain.gain.cancelScheduledValues(now);
     this.musicGain.gain.setTargetAtTime(procedural, now, smoothing);
     if (this.menuGain) {
       this.menuGain.gain.cancelScheduledValues(now);
       this.menuGain.gain.setTargetAtTime(menu, now, smoothing);
+    }
+    if (this.biomeGain) {
+      this.biomeGain.gain.cancelScheduledValues(now);
+      this.biomeGain.gain.setTargetAtTime(biome, now, smoothing);
     }
   }
 
@@ -209,15 +228,16 @@ export class AudioEngine {
     this.applyMusicGain(0.14);
   }
 
-  /** Menu uses a dedicated recorded loop; runs keep procedural biome music. */
+  /** Menu and runs both use recorded loops, crossfaded instead of cut. */
   setMenuMode(menu: boolean): void {
     this.menuMode = menu;
     if (menu) {
+      this.trackToken++;
       this.stopMusicScheduler();
-      this.playMenuTheme();
+      this.playMenuTheme(1.6);
     } else {
-      this.stopMenuTheme();
-      this.startMusic();
+      this.stopMusicScheduler();
+      void this.playBiome(this.currentBiome, 2.2);
     }
   }
 
@@ -228,7 +248,8 @@ export class AudioEngine {
       const response = await fetch(MENU_THEME);
       const bytes = await response.arrayBuffer();
       this.menuBuffer = await this.ctx.decodeAudioData(bytes);
-      if (this.menuMode) this.playMenuTheme();
+      if (this.menuMode) this.playMenuTheme(1.2);
+      void this.preloadBiomeTracks();
     } catch {
       // Fall back to the procedural theme if decoding fails.
       this.menuMode = false;
@@ -238,43 +259,181 @@ export class AudioEngine {
     }
   }
 
-  private playMenuTheme(): void {
-    if (!this.ctx || !this.menuGain || !this.menuBuffer) return;
-    this.stopMenuTheme();
-    const source = this.ctx.createBufferSource();
-    source.buffer = this.menuBuffer;
-    source.loop = true;
-    source.connect(this.menuGain);
-    source.start(0);
-    this.menuSource = source;
+  private async loadBiomeTrack(biome: BiomeId): Promise<AudioBuffer | null> {
+    const cached = this.trackCache.get(biome);
+    if (cached) return cached;
+    const existing = this.trackRequests.get(biome);
+    if (existing) return existing;
+
+    const request = (async () => {
+      if (!this.ctx) return null;
+      try {
+        const url = `${import.meta.env.BASE_URL}music/${biome}.ogg`;
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const bytes = await response.arrayBuffer();
+        const buffer = await this.ctx.decodeAudioData(bytes);
+        this.trackCache.set(biome, buffer);
+        return buffer;
+      } catch {
+        return null;
+      } finally {
+        this.trackRequests.delete(biome);
+      }
+    })();
+
+    this.trackRequests.set(biome, request);
+    return request;
   }
 
-  private stopMenuTheme(): void {
-    if (!this.menuSource) return;
+  private async preloadBiomeTracks(): Promise<void> {
+    if (this.preloading) return;
+    this.preloading = true;
+    // Let the menu theme start first; then warm the short biome loops.
+    await new Promise((resolve) => window.setTimeout(resolve, 1400));
+    for (const biome of BIOME_TRACK_IDS) {
+      if (!this.ctx) break;
+      await this.loadBiomeTrack(biome);
+    }
+  }
+
+  private fadeOutMenu(fade: number): void {
+    if (!this.ctx || !this.menuSource || !this.menuSourceGain) return;
+    const now = this.ctx.currentTime;
+    const source = this.menuSource;
+    const gain = this.menuSourceGain;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    gain.gain.linearRampToValueAtTime(0, now + fade);
     try {
-      this.menuSource.stop();
+      source.stop(now + fade + 0.08);
     } catch {
       // already stopped
     }
-    this.menuSource.disconnect();
     this.menuSource = null;
+    this.menuSourceGain = null;
+    window.setTimeout(() => {
+      try {
+        source.disconnect();
+        gain.disconnect();
+      } catch {
+        // already disconnected
+      }
+    }, (fade + 0.15) * 1000);
+  }
+
+  private playMenuTheme(fade = 1.2): void {
+    if (!this.ctx || !this.menuGain || !this.menuBuffer) return;
+    const now = this.ctx.currentTime;
+    this.fadeOutBiome(fade);
+    const source = this.ctx.createBufferSource();
+    const gain = this.ctx.createGain();
+    source.buffer = this.menuBuffer;
+    source.loop = true;
+    gain.gain.value = 0;
+    source.connect(gain);
+    gain.connect(this.menuGain);
+    source.start(now);
+    gain.gain.linearRampToValueAtTime(1, now + fade);
+    this.menuSource = source;
+    this.menuSourceGain = gain;
+  }
+
+  private fadeOutBiome(fade: number): void {
+    if (!this.ctx || !this.biomeSource || !this.biomeSourceGain) return;
+    const now = this.ctx.currentTime;
+    const source = this.biomeSource;
+    const gain = this.biomeSourceGain;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    gain.gain.linearRampToValueAtTime(0, now + fade);
+    try {
+      source.stop(now + fade + 0.08);
+    } catch {
+      // already stopped
+    }
+    this.biomeSource = null;
+    this.biomeSourceGain = null;
+    this.biomeBuffer = null;
+    window.setTimeout(() => {
+      try {
+        source.disconnect();
+        gain.disconnect();
+      } catch {
+        // already disconnected
+      }
+    }, (fade + 0.15) * 1000);
+  }
+
+  private async playBiome(biome: BiomeId, fade: number): Promise<void> {
+    const token = ++this.trackToken;
+    const buffer = await this.loadBiomeTrack(biome);
+    if (
+      !buffer ||
+      !this.ctx ||
+      !this.biomeGain ||
+      this.menuMode ||
+      token !== this.trackToken ||
+      this.currentBiome !== biome
+    ) {
+      if (!buffer && this.currentBiome === biome && !this.menuMode) {
+        this.stopMusicScheduler();
+        this.fadeOutMenu(fade);
+        this.startMusic();
+      }
+      return;
+    }
+
+    this.stopMusicScheduler();
+    this.fadeOutMenu(fade);
+    const now = this.ctx.currentTime;
+    const source = this.ctx.createBufferSource();
+    const gain = this.ctx.createGain();
+    source.buffer = buffer;
+    source.loop = true;
+    gain.gain.value = 0;
+    source.connect(gain);
+    gain.connect(this.biomeGain);
+    source.start(now);
+    gain.gain.linearRampToValueAtTime(1, now + fade);
+
+    const oldSource = this.biomeSource;
+    const oldGain = this.biomeSourceGain;
+    if (oldSource && oldGain) {
+      oldGain.gain.cancelScheduledValues(now);
+      oldGain.gain.setValueAtTime(oldGain.gain.value, now);
+      oldGain.gain.linearRampToValueAtTime(0, now + fade);
+      try {
+        oldSource.stop(now + fade + 0.08);
+      } catch {
+        // already stopped
+      }
+      window.setTimeout(() => {
+        try {
+          oldSource.disconnect();
+          oldGain.disconnect();
+        } catch {
+          // already disconnected
+        }
+      }, (fade + 0.15) * 1000);
+    }
+
+    this.biomeSource = source;
+    this.biomeSourceGain = gain;
+    this.biomeBuffer = biome;
   }
 
   /**
-   * Switch the loop to the next biome's theme. Notes already scheduled are
-   * left to decay naturally; the new phrase starts on the next step and the
-   * music bus dips for a fraction of a second so the change does not click.
+   * Switch to the next biome. The old loop fades out under the new one, so the
+   * transition lands on the biome change without a silent gap.
    */
   setBiome(biome: BiomeId): void {
     if (biome === this.currentBiome) return;
     this.currentBiome = biome;
     this.musicTheme = MUSIC_THEMES[biome] ?? DEFAULT_THEME;
-    if (!this.ctx || !this.musicGain || this.musicMuted) return;
-    const now = this.ctx.currentTime;
-    const target = (this.musicDucked ? 0.16 : 0.42) * this.musicVolume;
-    this.musicGain.gain.cancelScheduledValues(now);
-    this.musicGain.gain.setTargetAtTime(target * 0.58, now, 0.035);
-    this.musicGain.gain.setTargetAtTime(target, now + 0.5, 0.14);
+    if (!this.ctx || this.menuMode) return;
+    this.trackToken++;
+    void this.playBiome(biome, 1.8);
   }
 
   private canPlay(): boolean {
