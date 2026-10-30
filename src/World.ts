@@ -32,7 +32,6 @@ import type {
   BeltData,
   CoinData,
   DeathCause,
-  FallerData,
   FragileKind,
   FragileTileData,
   GameEvent,
@@ -147,10 +146,6 @@ const GEYSER_ERUPT_SECONDS = 0.7;
 // Fragile floor: crack for 1.2 s, then the plate is gone for 3.2 s.
 const FRAGILE_WARN_SECONDS = 1.2;
 const FRAGILE_GONE_SECONDS = 3.2;
-// Jungle coconuts: shadow grows for 1.2 s, the nut falls for 0.3 s.
-const FALLER_WARN_SECONDS = 1.2;
-const FALLER_FALL_SECONDS = 0.3;
-const FALLER_IMPACT_SECONDS = 0.35;
 // Ocean tide: a wave starts behind the hero and rolls forward for a few seconds.
 const TIDE_FIRST_DELAY = 4;
 const TIDE_GAP = 9;
@@ -173,15 +168,6 @@ const geyserVentGeometry = new THREE.CircleGeometry(0.24, 20);
 const fragileTileGeometry = new THREE.BoxGeometry(0.94, 0.06, 0.94);
 const fragileHoleGeometry = new THREE.PlaneGeometry(0.94, 0.94);
 const fragileCrackGeometry = new THREE.BoxGeometry(0.04, 0.02, 0.62);
-const coconutGeometry = new THREE.IcosahedronGeometry(0.32, 0);
-const coconutStemGeometry = new THREE.BoxGeometry(0.07, 0.13, 0.07);
-const fallerShadowGeometry = new THREE.CircleGeometry(0.42, 18);
-const fallerShadowMaterial = new THREE.MeshBasicMaterial({
-  color: 0x000000,
-  transparent: true,
-  opacity: 0.32,
-  depthWrite: false
-});
 const tarPitGeometry = new THREE.CircleGeometry(0.44, 20);
 const tarRingGeometry = new THREE.RingGeometry(0.44, 0.52, 20);
 const tarBubbleGeometry = new THREE.SphereGeometry(0.06, 6, 4);
@@ -383,12 +369,11 @@ export class World {
           );
           const geyser = (spawnRow.geysers ?? []).some((g) => Math.abs(g.x - x) < 0.8);
           const fragile = (spawnRow.fragile ?? []).some((tile) => Math.abs(tile.x - x) < 0.8);
-          const faller = (spawnRow.fallers ?? []).some((drop) => Math.abs(drop.x - x) < 0.8);
           const sink = (spawnRow.sinkholes ?? []).some((hole) => Math.abs(hole.x - x) < 0.8);
           const roller = (spawnRow.rollers ?? []).some(
             (item) => Math.abs(item.x - x) < item.radius + 0.8
           );
-          if (!blocked && !geyser && !fragile && !faller && !sink && !roller) {
+          if (!blocked && !geyser && !fragile && !sink && !roller) {
             spawnX = x;
             break;
           }
@@ -614,7 +599,6 @@ export class World {
     }
 
     for (const fragile of row.fragile ?? []) this.buildFragileTile(fragile, row);
-    for (const faller of row.fallers ?? []) this.buildFaller(faller, row);
     for (const pile of row.leafPiles ?? []) this.buildLeafPile(pile, row);
     for (const pit of row.tarPits ?? []) this.buildTarPit(pit, row);
     for (const hole of row.sinkholes ?? []) this.buildSinkhole(hole, row);
@@ -844,9 +828,6 @@ export class World {
     if (mechanics.fragile && this.mode !== "menu" && this.rng() < chance(0.15 + risk * 0.85)) {
       this.addFragile(row, mechanics.fragile);
     }
-    if (mechanics.fallers && this.mode !== "menu" && this.rng() < chance(0.2 + risk * 0.7)) {
-      this.addFaller(row);
-    }
     if (mechanics.leafPiles && this.mode !== "menu" && this.rng() < 0.55) {
       this.addLeafPiles(row);
     }
@@ -870,7 +851,6 @@ export class World {
       if (piles.length >= count) break;
       if (row.props.some((prop) => prop.collider && Math.abs(prop.x - x) < prop.radius + 0.55)) continue;
       if ((row.geysers ?? []).some((geyser) => Math.abs(geyser.x - x) < 0.8)) continue;
-      if ((row.fallers ?? []).some((faller) => Math.abs(faller.x - x) < 0.8)) continue;
       if ((row.fragile ?? []).some((tile) => Math.abs(tile.x - x) < 0.8)) continue;
       piles.push({ x, collected: false });
     }
@@ -903,7 +883,6 @@ export class World {
       if (holes.length >= count) break;
       if (row.props.some((prop) => prop.collider && Math.abs(prop.x - x) < prop.radius + 0.55)) continue;
       if ((row.geysers ?? []).some((geyser) => Math.abs(geyser.x - x) < 0.8)) continue;
-      if ((row.fallers ?? []).some((faller) => Math.abs(faller.x - x) < 0.8)) continue;
       if ((row.fragile ?? []).some((tile) => Math.abs(tile.x - x) < 0.8)) continue;
       if ((row.leafPiles ?? []).some((pile) => Math.abs(pile.x - x) < 0.8)) continue;
       if ((row.tarPits ?? []).some((pit) => Math.abs(pit.x - x) < 0.8)) continue;
@@ -963,38 +942,6 @@ export class World {
       lane[i] = lane[j];
       lane[j] = swap;
     }
-  }
-
-  /** Jungle: a coconut drops onto a cell after its shadow has grown. */
-  private addFaller(row: Row): void {
-    const count =
-      (this.rng() < 0.55 ? 1 : 2) + Math.floor(this.riskAt(row.z) * 10 * this.tuneAt(row.z));
-    const lane = [-3, -2, -1, 0, 1, 2, 3];
-    for (let i = lane.length - 1; i > 0; i--) {
-      const j = Math.floor(this.rng() * (i + 1));
-      const swap = lane[i];
-      lane[i] = lane[j];
-      lane[j] = swap;
-    }
-    const fallers: FallerData[] = [];
-    for (const x of lane) {
-      if (fallers.length >= count) break;
-      if (row.props.some((prop) => prop.collider && Math.abs(prop.x - x) < prop.radius + 0.55)) continue;
-      if ((row.geysers ?? []).some((geyser) => Math.abs(geyser.x - x) < 0.8)) continue;
-      if ((row.rollers ?? []).some((roller) => Math.abs(roller.x - x) < roller.radius + 0.6)) continue;
-      if ((row.fragile ?? []).some((tile) => Math.abs(tile.x - x) < 0.8)) continue;
-      const period =
-        (FALLER_WARN_SECONDS + FALLER_FALL_SECONDS + FALLER_IMPACT_SECONDS + 2.4 + this.rng() * 1.5) /
-        this.pressureAt(row.z);
-      fallers.push({
-        x,
-        period,
-        phase: this.rng() * period,
-        state: "idle",
-        timer: 0
-      });
-    }
-    if (fallers.length > 0) row.fallers = fallers;
   }
 
   /** Void and Halloween ground plates that crack and drop out from under you. */
@@ -1209,7 +1156,6 @@ export class World {
       if (row.props.some((p) => p.collider && Math.abs(p.x - x) < 1.05)) continue;
       if (row.geysers?.some((g) => Math.abs(g.x - x) < 0.75)) continue;
       if (row.fragile?.some((tile) => Math.abs(tile.x - x) < 0.75)) continue;
-      if (row.fallers?.some((faller) => Math.abs(faller.x - x) < 0.75)) continue;
       if (row.leafPiles?.some((pile) => Math.abs(pile.x - x) < 0.75)) continue;
       if (row.tarPits?.some((pit) => Math.abs(pit.x - x) < 0.75)) continue;
       if (row.sinkholes?.some((hole) => Math.abs(hole.x - x) < 0.75)) continue;
@@ -1408,7 +1354,6 @@ export class World {
     this.updatePlayer(dt, time);
     this.updateGeysers(dt, time);
     this.updateFragile(dt, time);
-    this.updateFallers(dt, time);
     this.updateTide(dt);
     this.updateSinkholes(dt);
     this.updateWind(dt);
@@ -1681,127 +1626,6 @@ export class World {
     }
     belt.mesh = mesh;
     belt.texture = texture;
-  }
-
-  private buildFaller(faller: FallerData, row: Row): void {
-    const shadow = new THREE.Mesh(fallerShadowGeometry, fallerShadowMaterial);
-    shadow.rotation.x = -Math.PI / 2;
-    shadow.position.set(faller.x, 0.026, 0);
-    shadow.visible = false;
-    const warnRing = new THREE.Mesh(
-      new THREE.RingGeometry(0.5, 0.62, 20),
-      new THREE.MeshBasicMaterial({
-        color: 0xffb35c,
-        transparent: true,
-        opacity: 0.65,
-        depthWrite: false,
-        side: THREE.DoubleSide
-      })
-    );
-    warnRing.position.z = 0.002;
-    shadow.add(warnRing);
-    const nut = new THREE.Group();
-    const fallerColor =
-      row.biome === "frost" ? 0xd9f4ff :
-      row.biome === "candy" ? 0xff6f9f :
-      row.biome === "void" ? 0xc48bff :
-      0x6b4a2c;
-    const shell = new THREE.Mesh(
-      coconutGeometry,
-      new THREE.MeshLambertMaterial({ color: fallerColor })
-    );
-    shell.scale.setScalar(1.2);
-    nut.add(shell);
-    if (row.biome !== "frost" && row.biome !== "candy" && row.biome !== "void") {
-      const stem = new THREE.Mesh(
-        coconutStemGeometry,
-        new THREE.MeshLambertMaterial({ color: 0x4f8b3e })
-      );
-      stem.position.y = 0.4;
-      nut.add(stem);
-    }
-    nut.position.set(faller.x, 6, 0);
-    nut.visible = false;
-    row.group.add(shadow, nut);
-    faller.shadow = shadow;
-    faller.nut = nut;
-  }
-
-  private updateFallers(dt: number, time: number): void {
-    if (this.mode === "menu") return;
-    const p = this.player;
-    if (p.dead) return;
-    const nearMin = p.z - 6;
-    const nearMax = p.z + 20;
-    for (const row of this.rows.values()) {
-      if (!row.fallers || row.z < nearMin || row.z > nearMax) continue;
-      for (const faller of row.fallers) {
-        const local = ((time + faller.phase) % faller.period + faller.period) % faller.period;
-        const warnEnd = FALLER_WARN_SECONDS;
-        const fallEnd = warnEnd + FALLER_FALL_SECONDS;
-        const impactEnd = fallEnd + FALLER_IMPACT_SECONDS;
-        const next: FallerData["state"] =
-          local < warnEnd
-            ? "warn"
-            : local < fallEnd
-              ? "fall"
-              : local < impactEnd
-                ? "impact"
-                : "idle";
-
-        if (next !== faller.state) {
-          faller.state = next;
-          if (next === "warn") {
-            if (faller.shadow) {
-              faller.shadow.visible = true;
-              faller.shadow.scale.setScalar(0.55);
-            }
-          } else if (next === "fall") {
-            if (faller.nut) faller.nut.visible = true;
-            if (faller.shadow) {
-              faller.shadow.visible = true;
-              faller.shadow.scale.setScalar(1);
-            }
-          } else if (next === "impact") {
-            if (faller.shadow) faller.shadow.visible = false;
-            if (faller.nut) {
-              faller.nut.position.y = 0.32;
-              faller.nut.scale.set(1.3, 0.4, 1.3);
-            }
-            this.sceneView.particles.burstDust(faller.x, row.z, 12, 0xb08a52);
-            if (Math.abs(row.z - p.z) < 10) this.events.push({ type: "bump" });
-            if (
-              Math.abs(p.z - row.z) < 0.55 &&
-              Math.abs(p.x - faller.x) < 0.45 &&
-              p.y < 1.0
-            ) {
-              this.die("coconut");
-              return;
-            }
-          } else {
-            if (faller.shadow) faller.shadow.visible = false;
-            if (faller.nut) {
-              faller.nut.visible = false;
-              faller.nut.scale.set(1, 1, 1);
-            }
-          }
-        }
-
-        if (local >= warnEnd && local < fallEnd) {
-          const t = (local - warnEnd) / FALLER_FALL_SECONDS;
-          if (faller.nut) {
-            faller.nut.position.set(faller.x, 6 - t * t * 5.68, 0);
-            faller.nut.rotation.set(t * 4, t * 2, t * 3);
-          }
-          if (faller.shadow) {
-            faller.shadow.visible = true;
-            faller.shadow.scale.setScalar(1);
-          }
-        } else if (local < warnEnd && faller.shadow) {
-          faller.shadow.scale.setScalar(0.55 + (local / warnEnd) * 0.45);
-        }
-      }
-    }
   }
 
   private updateLeafPiles(): void {
@@ -2980,16 +2804,6 @@ export class World {
     for (const fragile of row.fragile ?? []) {
       if (Math.abs(fragile.x - x) < 0.7) return false;
     }
-    for (const faller of row.fallers ?? []) {
-      if (Math.abs(faller.x - x) >= 0.7) continue;
-      const local =
-        ((this.time + time + faller.phase) % faller.period + faller.period) % faller.period;
-      // The coconut only hurts during the fall/impact slice. Waiting for the
-      // whole cycle would strand the bot on a safe lane and feed the eagle.
-      if (local >= FALLER_WARN_SECONDS - 0.15 && local <= FALLER_WARN_SECONDS + FALLER_FALL_SECONDS + FALLER_IMPACT_SECONDS) {
-        return false;
-      }
-    }
     // Sinkholes are avoided while routing: the bot is not good at lingering
     // next to them, and a wrong panic hop is worse than waiting for a lane.
     for (const sink of row.sinkholes ?? []) {
@@ -3225,9 +3039,6 @@ export class World {
           color: tile.kind === "ghost" ? "#d8a0ff" : "#8b6ff0",
           kind: "fragile"
         });
-      }
-      for (const faller of row.fallers ?? []) {
-        boxes.push({ x: faller.x, z: row.z, hx: 0.42, hz: 0.42, color: "#c9e265", kind: "faller" });
       }
       for (const hole of row.sinkholes ?? []) {
         boxes.push({ x: hole.x, z: row.z, hx: 0.48, hz: 0.48, color: "#9c7a4a", kind: "sink" });

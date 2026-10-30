@@ -142,16 +142,6 @@ export interface TrafficLightData {
 
 export type FragileKind = "void" | "ghost";
 
-export interface FallerData {
-  x: number;
-  period: number;
-  phase: number;
-  state: "idle" | "warn" | "fall" | "impact";
-  timer: number;
-  shadow?: THREE.Mesh;
-  nut?: THREE.Group;
-}
-
 export interface LeafPileData {
   x: number;
   collected: boolean;
@@ -208,7 +198,6 @@ export interface Row {
   rollers?: RollerData[];
   light?: TrafficLightData;
   fragile?: FragileTileData[];
-  fallers?: FallerData[];
   leafPiles?: LeafPileData[];
   tarPits?: TarPitData[];
   sinkholes?: SinkholeData[];

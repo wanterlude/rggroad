@@ -56,8 +56,6 @@ export interface BiomeMechanics {
   storm?: boolean;
   /** Void and Halloween: floor tiles that crack and disappear. */
   fragile?: "void" | "ghost";
-  /** Jungle: coconuts that fall onto a cell after a growing shadow. */
-  fallers?: "coconut";
   /** Autumn: bonus leaf piles on safe rows. */
   leafPiles?: boolean;
   /** Prehistoric: tar pits slow the next hop. */
@@ -608,10 +606,10 @@ const BASE_BIOMES: Record<BaseBiomeId, BiomeDef> = {
 
 const BASE_MECHANICS: Record<BaseBiomeId, BiomeMechanics> = {
   autumn: { speed: 1, road: 0.43, river: 0.22, rail: 0.14, water: "logs", police: false, idle: "eagle", stampede: false, leafPiles: true },
-  forest: { speed: 1.02, road: 0.42, river: 0.22, rail: 0.13, water: "logs", police: false, idle: "eagle", stampede: false, rollers: "log", fallers: "coconut" },
+  forest: { speed: 1.02, road: 0.42, river: 0.22, rail: 0.13, water: "logs", police: false, idle: "eagle", stampede: false, rollers: "log" },
   desert: { speed: 1.08, road: 0.5, river: 0.12, rail: 0.12, water: "crocodile", police: false, idle: "eagle", stampede: false, rollers: "tumbleweed" },
   ocean: { speed: 0.85, road: 0.2, river: 0.4, rail: 0.04, water: "logs", police: false, idle: "eagle", stampede: false, tide: true },
-  frost: { speed: 1.06, road: 0.38, river: 0.26, rail: 0.12, water: "ice", police: false, idle: "eagle", stampede: false, slide: true, fragile: "void", fallers: "coconut", sink: true, wind: true },
+  frost: { speed: 1.06, road: 0.38, river: 0.26, rail: 0.12, water: "ice", police: false, idle: "eagle", stampede: false, slide: true, fragile: "void", sink: true, wind: true },
   lava: { speed: 1.25, road: 0.42, river: 0.23, rail: 0.13, water: "logs", police: false, idle: "eagle", stampede: false, geysers: true },
   void: { speed: 1.32, road: 0.43, river: 0.24, rail: 0.14, water: "ice", police: false, idle: "ufo", stampede: false, fragile: "void", sink: true, rollers: "tumbleweed" }
 };
@@ -704,7 +702,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
       { kind: "mushroom", weight: 0.2 },
       { kind: "pebble", weight: 0.12 }
     ],
-    mechanics: { speed: 1.06, road: 0.32, river: 0.42, rail: 0.11, water: "lily", police: false, idle: "eagle", stampede: false, fallers: "coconut", fragile: "ghost" }
+    mechanics: { speed: 1.06, road: 0.32, river: 0.42, rail: 0.11, water: "lily", police: false, idle: "eagle", stampede: false, fragile: "ghost" }
   }),
   city: variant("city", "ГОРОД", "autumn", {
     grass: [0x6f8a5c, 0x667f54, 0x7c9668],
@@ -817,7 +815,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
       { kind: "tuft", weight: 0.2 },
       { kind: "mushroom", weight: 0.4 }
     ],
-    mechanics: { speed: 0.98, road: 0.36, river: 0.32, rail: 0.1, water: "chocolate", police: false, idle: "candy-plane", stampede: false, belts: true, fragile: "ghost", fallers: "coconut", sink: true, geysers: true }
+    mechanics: { speed: 0.98, road: 0.36, river: 0.32, rail: 0.1, water: "chocolate", police: false, idle: "candy-plane", stampede: false, belts: true, fragile: "ghost", sink: true, geysers: true }
   }),
   prehistoric: variant("prehistoric", "ДОИСТОРИЯ", "forest", {
     grass: [0x78a04a, 0x6f9443, 0x83ac53],
@@ -890,7 +888,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
       { kind: "pebble", weight: 0.3 },
       { kind: "tuft", weight: 0.15 }
     ],
-    mechanics: { speed: 1.15, road: 0.4, river: 0.26, rail: 0.15, water: "logs", police: false, idle: "bat", stampede: false, fragile: "ghost", fallers: "coconut", sink: true, rollers: "tumbleweed", geysers: true }
+    mechanics: { speed: 1.15, road: 0.4, river: 0.26, rail: 0.15, water: "logs", police: false, idle: "bat", stampede: false, fragile: "ghost", sink: true, rollers: "tumbleweed", geysers: true }
   }),
   swamp: variant("swamp", "БОЛОТО", "ocean", {
     accent: 0xc8e86a,
