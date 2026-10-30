@@ -754,7 +754,7 @@ export class World {
   private addRoadSegment(z: number): void {
     const d = this.difficultyAt(z);
     const width = Math.min(
-      clamp(1 + Math.floor(this.rng() * (1.45 + d * 2.2)), 1, 4),
+      clamp(1 + Math.floor(this.rng() * (1.45 + d * 2.2)), 1, 3),
       this.segmentRoom(z)
     );
     const baseDir: 1 | -1 = this.rng() < 0.5 ? 1 : -1;
