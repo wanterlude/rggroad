@@ -1,4 +1,5 @@
 import { SKINS, SKIN_ORDER, type SkinId } from "./config";
+import { BIOMES, BIOME_ORDER, INTERMEDIATE_ORDER, type BiomeId } from "./biomes";
 import { drawPortrait } from "./Portraits";
 import { GENERATED_ART } from "./assets/art";
 import { save } from "./save";
@@ -17,6 +18,8 @@ interface UIHandlers {
   onSound: () => void;
   onMusic: () => void;
   onMusicVolume: (value: number) => void;
+  onBiomeMode: () => void;
+  onBiomePractice: (biome: BiomeId) => void;
   onSkin: (skin: SkinId) => void;
   onFavorite: (skin: SkinId) => void;
   onSeason: () => void;
@@ -87,6 +90,16 @@ export class UI {
     menuMusicLabel: $("menuMusicLabel"),
     pauseMusicLabel: $("pauseMusicLabel"),
     menuMusicBtn: $<HTMLButtonElement>("menuMusicBtn"),
+    biomeModeBtn: $<HTMLButtonElement>("biomeModeBtn"),
+    biomeModal: $("biomeModal"),
+    biomeGrid: $("biomeGrid"),
+    biomeSelectedName: $("biomeSelectedName"),
+    biomeSelectedBest: $("biomeSelectedBest"),
+    biomeStartBtn: $<HTMLButtonElement>("biomeStartBtn"),
+    biomeCloseBtn: $<HTMLButtonElement>("biomeCloseBtn"),
+    practiceBadge: $("practiceBadge"),
+    practiceBadgeName: $("practiceBadgeName"),
+    practiceBadgeBest: $("practiceBadgeBest"),
     menuMusicVolume: $<HTMLInputElement>("menuMusicVolume"),
     menuMusicVolumeLabel: $("menuMusicVolumeLabel"),
     pauseMusicBtn: $<HTMLButtonElement>("pauseMusicBtn"),
@@ -99,6 +112,8 @@ export class UI {
     overMenuBtn: $<HTMLButtonElement>("overMenuBtn"),
     overTitle: $("overTitle"),
     overMessage: $("overMessage"),
+    overMode: $("overMode"),
+    finalBestCaption: $("finalBestCaption"),
     finalScore: $("finalScore"),
     finalBest: $("finalBest"),
     runCoins: $("runCoins"),
@@ -114,6 +129,9 @@ export class UI {
   private tutorialUsed = false;
   private lastLeaderboard: LeaderboardState | null = null;
   private nicknameForced = false;
+  private selectedBiome: BiomeId = "autumn";
+  private practiceBiome: BiomeId | null = null;
+  private practiceBest = 0;
 
   constructor(private handlers: UIHandlers) {
     const { refs } = this;
@@ -128,6 +146,20 @@ export class UI {
     refs.menuSoundBtn.addEventListener("click", () => handlers.onSound());
     refs.pauseSoundBtn.addEventListener("click", () => handlers.onSound());
     refs.menuMusicBtn.addEventListener("click", () => handlers.onMusic());
+    refs.biomeModeBtn.addEventListener("click", () => handlers.onBiomeMode());
+    refs.biomeCloseBtn.addEventListener("click", () => this.closeBiomePicker());
+    document.addEventListener("keydown", (event) => {
+      if (event.code === "Escape" && !refs.biomeModal.classList.contains("hidden")) {
+        event.preventDefault();
+        this.closeBiomePicker();
+      }
+    });
+    refs.biomeStartBtn.addEventListener("click", () => {
+      if (this.refs.biomeStartBtn.disabled) return;
+      const biome = this.selectedBiome;
+      this.closeBiomePicker();
+      handlers.onBiomePractice(biome);
+    });
     refs.menuMusicVolume.addEventListener("input", () => {
       handlers.onMusicVolume(Number(refs.menuMusicVolume.value) / 100);
       this.updateMusicVolumeUI(Number(refs.menuMusicVolume.value) / 100);
@@ -187,7 +219,76 @@ export class UI {
     element.classList.toggle("hidden", hidden);
   }
 
+  openBiomePicker(): void {
+    this.renderBiomeGrid();
+    this.setHidden(this.refs.biomeModal, false);
+    this.refs.biomeModal.setAttribute("aria-hidden", "false");
+  }
+
+  closeBiomePicker(): void {
+    this.setHidden(this.refs.biomeModal, true);
+    this.refs.biomeModal.setAttribute("aria-hidden", "true");
+  }
+
+  private renderBiomeGrid(): void {
+    const order: BiomeId[] = [...BIOME_ORDER, ...INTERMEDIATE_ORDER];
+    this.refs.biomeGrid.replaceChildren();
+    for (const id of order) {
+      const def = BIOMES[id];
+      const best = save.data.biomeBests[id] ?? 0;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "biome-choice";
+      button.dataset.biome = id;
+      button.style.setProperty(
+        "--biome-accent",
+        `#${def.accent.toString(16).padStart(6, "0")}`
+      );
+      const name = document.createElement("span");
+      name.className = "biome-choice-name";
+      name.textContent = def.name;
+      const record = document.createElement("span");
+      record.className = "biome-choice-best";
+      record.textContent = `РЕКОРД ${fmt(best)}`;
+      button.append(name, record);
+      button.addEventListener("click", () => {
+        this.selectedBiome = id;
+        this.updateBiomeSelection();
+      });
+      this.refs.biomeGrid.append(button);
+    }
+    this.updateBiomeSelection();
+  }
+
+  private updateBiomeSelection(): void {
+    const def = BIOMES[this.selectedBiome];
+    const best = save.data.biomeBests[this.selectedBiome] ?? 0;
+    this.refs.biomeSelectedName.textContent = def.name;
+    this.refs.biomeSelectedBest.textContent = `ЛУЧШИЙ РЕЗУЛЬТАТ: ${fmt(best)}`;
+    this.refs.biomeStartBtn.disabled = false;
+    for (const button of this.refs.biomeGrid.querySelectorAll<HTMLButtonElement>(".biome-choice")) {
+      const active = button.dataset.biome === this.selectedBiome;
+      button.classList.toggle("is-selected", active);
+      button.setAttribute("aria-pressed", String(active));
+    }
+  }
+
+  setPracticeMode(biome: BiomeId | null, best = 0): void {
+    this.practiceBiome = biome;
+    this.practiceBest = Math.max(0, best);
+    if (!biome) {
+      this.setHidden(this.refs.practiceBadge, true);
+      return;
+    }
+    const def = BIOMES[biome];
+    this.refs.practiceBadgeName.textContent = def.name;
+    this.refs.practiceBadgeBest.textContent = `ЛУЧШИЙ ${fmt(this.practiceBest)}`;
+    this.setHidden(this.refs.practiceBadge, false);
+  }
+
   showMenu(): void {
+    this.setPracticeMode(null);
+    this.closeBiomePicker();
     this.setHidden(this.refs.menu, false);
     this.setHidden(this.refs.hud, true);
     this.setHidden(this.refs.eagleWarning, true);
@@ -439,6 +540,7 @@ export class UI {
     runCoins: number;
     biomes: number;
     isRecord: boolean;
+    practiceName?: string;
   }): void {
     this.hideEagleWarning();
     this.hideMilestone();
@@ -502,6 +604,12 @@ export class UI {
     this.refs.overMessage.textContent = message;
     this.refs.finalScore.textContent = fmt(options.score);
     this.refs.finalBest.textContent = fmt(options.best);
+    this.refs.finalBestCaption.textContent = options.practiceName ? "ЛУЧШИЙ В БИОМЕ" : "ЛУЧШИЙ";
+    this.refs.overMode.textContent = options.practiceName ? `ПРАКТИКА · ${options.practiceName}` : "";
+    this.setHidden(this.refs.overMode, !options.practiceName);
+    this.refs.newBestRibbon.textContent = options.practiceName
+      ? "НОВЫЙ РЕКОРД БИОМА!"
+      : "НОВЫЙ РЕКОРД!";
     this.refs.runCoins.textContent = fmt(options.runCoins);
     this.refs.runBiomes.textContent = fmt(options.biomes);
     this.setHidden(this.refs.newBestRibbon, !options.isRecord);
@@ -515,17 +623,19 @@ export class UI {
 
   updateHUD(score: number, animateScore = false, animateCoin = false): void {
     const { refs } = this;
-    const best = Math.max(save.data.best, score);
+    const best = this.practiceBiome
+      ? Math.max(this.practiceBest, score)
+      : Math.max(save.data.best, score);
     refs.scoreValue.textContent = fmt(score);
     refs.bestValue.textContent = fmt(best);
     refs.coinValue.textContent = fmt(save.data.coins);
     refs.menuBest.textContent = fmt(save.data.best);
     refs.menuCoins.textContent = fmt(save.data.coins);
     if (best <= 0) {
-      refs.recordGap.textContent = "ПЕРВЫЙ РЕКОРД";
+      refs.recordGap.textContent = this.practiceBiome ? "ПЕРВЫЙ РЕКОРД БИОМА" : "ПЕРВЫЙ РЕКОРД";
       refs.recordGap.classList.remove("is-record");
     } else if (score >= best) {
-      refs.recordGap.textContent = "РЕКОРД ПОБИТ!";
+      refs.recordGap.textContent = this.practiceBiome ? "РЕКОРД БИОМА ПОБИТ!" : "РЕКОРД ПОБИТ!";
       refs.recordGap.classList.add("is-record");
     } else {
       refs.recordGap.textContent = `ДО РЕКОРДА ${Math.ceil(best - score)}`;

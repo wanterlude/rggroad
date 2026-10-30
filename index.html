@@ -27,6 +27,12 @@
           <div id="newBestBadge" class="new-best hidden">НОВЫЙ РЕКОРД!</div>
         </div>
 
+        <div id="practiceBadge" class="practice-badge hidden" aria-live="polite">
+          <span>ПРАКТИКА</span>
+          <b id="practiceBadgeName"></b>
+          <small id="practiceBadgeBest"></small>
+        </div>
+
         <div class="hud-right">
           <div class="coin-pill" title="Монеты">
             <span class="coin-icon" aria-hidden="true"></span>
@@ -134,6 +140,10 @@
 
           <div class="menu-footer">
             <div class="menu-sound-group">
+              <button id="biomeModeBtn" class="text-button biome-mode-entry" type="button">
+                <span class="biome-mode-glyph" aria-hidden="true">▦</span>
+                <span>БИОМ-РЕКОРДЫ</span>
+              </button>
               <button id="menuSoundBtn" class="text-button" type="button" aria-pressed="false">
                 <span class="sound-dot" aria-hidden="true"></span>
                 <span id="menuSoundLabel">ЗВУКИ ВКЛ</span>
@@ -208,12 +218,13 @@
           <div id="newBestRibbon" class="new-best-ribbon hidden">НОВЫЙ РЕКОРД!</div>
           <div id="overTitle" class="modal-eyebrow over-kicker">БУМ!</div>
           <h2 class="modal-title">ЗАБЕГ ОКОНЧЕН</h2>
+          <div id="overMode" class="over-mode hidden"></div>
           <p id="overMessage" class="modal-copy">Машины не тормозят.</p>
 
           <div class="score-display">
             <span class="score-display-label">ТВОЙ СЧЁТ</span>
             <strong id="finalScore">0</strong>
-            <span class="score-display-best">ЛУЧШИЙ <b id="finalBest">0</b></span>
+            <span class="score-display-best"><span id="finalBestCaption">ЛУЧШИЙ</span> <b id="finalBest">0</b></span>
           </div>
 
           <div class="run-coins">
@@ -230,6 +241,28 @@
           <div class="modal-actions">
             <button id="retryBtn" class="big-button primary" type="button">ЕЩЁ РАЗ</button>
             <button id="overMenuBtn" class="big-button ghost" type="button">В МЕНЮ</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Biome practice picker -->
+      <section id="biomeModal" class="screen modal-screen hidden" aria-label="Рекорды биомов" aria-modal="true" role="dialog">
+        <div class="modal-card biome-card">
+          <div class="biome-head">
+            <div>
+              <div class="modal-eyebrow">ЛОКАЛЬНЫЕ РЕКОРДЫ</div>
+              <h2 class="modal-title biome-title">ВЫБЕРИ БИОМ</h2>
+            </div>
+            <button id="biomeCloseBtn" class="biome-close" type="button" aria-label="Закрыть">×</button>
+          </div>
+          <p class="modal-copy biome-copy">Бесконечный забег только в выбранном мире. Общий рекорд, монеты и лидерборд не меняются.</p>
+          <div id="biomeGrid" class="biome-grid" role="group" aria-label="Биомы"></div>
+          <div class="biome-footer">
+            <div class="biome-selected">
+              <strong id="biomeSelectedName">ОСЕНЬ</strong>
+              <span id="biomeSelectedBest">ЛУЧШИЙ РЕЗУЛЬТАТ: 0</span>
+            </div>
+            <button id="biomeStartBtn" class="big-button primary" type="button">ИГРАТЬ В БИОМЕ</button>
           </div>
         </div>
       </section>

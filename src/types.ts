@@ -19,6 +19,8 @@ export interface SaveData {
   runs: number;
   /** 2 = first five heroes are free, the rest cost 10 coins. */
   economyVersion: number;
+  /** Best local score per biome (practice mode). */
+  biomeBests: Partial<Record<BiomeId, number>>;
 }
 
 export interface CubeSpec {

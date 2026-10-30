@@ -1,5 +1,6 @@
 import { SAVE_KEY, SKINS, SKIN_ORDER, type SkinId } from "./config";
 import type { SaveData } from "./types";
+import { BIOMES } from "./biomes";
 
 // The first five heroes are free; the rest unlock for 10 coins. Only the free
 // ones are granted on a fresh save — everything else has to be earned.
@@ -16,7 +17,8 @@ const defaults: SaveData = {
   musicMuted: false,
   musicVolume: 0.05,
   runs: 0,
-  economyVersion: ECONOMY_VERSION
+  economyVersion: ECONOMY_VERSION,
+  biomeBests: {}
 };
 
 function isSkinId(value: unknown): value is SkinId {
@@ -58,6 +60,15 @@ function sanitize(raw: unknown): SaveData {
   if (typeof src.musicVolume === "number" && Number.isFinite(src.musicVolume)) {
     data.musicVolume = Math.min(1, Math.max(0, src.musicVolume));
   }
+  const biomeBests: Partial<Record<keyof typeof BIOMES, number>> = {};
+  if (src.biomeBests && typeof src.biomeBests === "object") {
+    for (const [key, value] of Object.entries(src.biomeBests)) {
+      if (key in BIOMES && typeof value === "number" && Number.isFinite(value) && value > 0) {
+        biomeBests[key as keyof typeof BIOMES] = Math.floor(value);
+      }
+    }
+  }
+  data.biomeBests = biomeBests;
   data.economyVersion = ECONOMY_VERSION;
   return data;
 }

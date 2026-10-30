@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { SKINS, type SkinId } from "./config";
-import type { BiomeId } from "./biomes";
+import { BIOMES, type BiomeId } from "./biomes";
 import { SceneView } from "./SceneView";
 import { World } from "./World";
 import { AudioEngine } from "./AudioEngine";
@@ -63,6 +63,7 @@ export class Game {
   private isoOverride: IsoCameraOverride | null = null;
   private readonly boot: GameBootOptions;
   private debugRun = false;
+  private practiceBiome: BiomeId | null = null;
   private readonly biomesVisited = new Set<string>();
   private runMilestone = 0;
   private season: SeasonId;
@@ -82,9 +83,11 @@ export class Game {
     });
     this.ui = new UI({
       onPlay: () => this.startRun(),
+      onBiomeMode: () => this.openBiomeMode(),
+      onBiomePractice: (biome) => this.startRun(biome),
       onPause: () => this.pause(),
       onResume: () => this.resume(),
-      onRestart: () => this.startRun(),
+      onRestart: () => this.startRun(this.practiceBiome),
       onMenu: () => this.goMenu(),
       onSound: () => this.toggleSound(),
       onMusic: () => this.toggleMusic(),
@@ -135,7 +138,7 @@ export class Game {
       sceneView: this.sceneView,
       seed: menu ? undefined : (this.benchSeed ?? this.boot.seed),
       startZ: menu ? undefined : this.boot.row,
-      forceBiome: menu ? undefined : this.boot.biome,
+      forceBiome: menu ? undefined : (this.practiceBiome ?? this.boot.biome),
       bot: menu ? undefined : this.boot.bot
     });
   }
@@ -151,8 +154,9 @@ export class Game {
     this.pointer = null;
   }
 
-  private startRun(): void {
+  private startRun(practiceBiome: BiomeId | null = null): void {
     if (this.state === "playing" || this.state === "dying") return;
+    this.practiceBiome = practiceBiome;
     if (!this.benchMode) {
       this.audio.init();
       this.audio.setMusicDucked(false);
@@ -165,7 +169,7 @@ export class Game {
     this.sceneView.setEnvironmentVisible(false);
     this.sceneView.particles.clear();
     this.state = "playing";
-    this.debugRun = this.world.isDebugRun();
+    this.debugRun = this.world.isDebugRun() && !this.practiceBiome;
     this.lastBiomeBoundary = this.world.getNextBiomeBoundary();
     this.lastBiomeId = this.world.getBiome().id;
     this.lastElite = this.world.getElite();
@@ -174,7 +178,9 @@ export class Game {
     this.biomesVisited.clear();
     this.biomesVisited.add(this.lastBiomeId);
     this.runMilestone = Math.floor(this.score / 50);
-    this.startingBest = save.data.best;
+    this.startingBest = this.practiceBiome
+      ? save.data.biomeBests[this.practiceBiome] ?? 0
+      : save.data.best;
     this.newBestShown = false;
     this.deathTimer = 0;
     this.demoDeathTimer = 0;
@@ -184,6 +190,7 @@ export class Game {
     this.pointer = null;
     this.camAnchor.set(this.world.player.x, 0, this.world.player.z);
     if (!this.benchMode) {
+      this.ui.setPracticeMode(this.practiceBiome, this.startingBest);
       this.ui.showPlaying();
       this.ui.updateHUD(this.score);
       this.ui.updateStats();
@@ -202,8 +209,15 @@ export class Game {
     this.ui.showBiomeBanner(elite ? `${biome.name} · НОЧЬ` : biome.name, biome.description ?? "");
   }
 
+  private openBiomeMode(): void {
+    if (this.state !== "menu") return;
+    this.audio.init();
+    this.ui.openBiomePicker();
+  }
+
   private goMenu(): void {
     this.audio.setMusicDucked(false);
+    this.practiceBiome = null;
     this.audio.setMenuMode(true);
     this.audio.setBiome("autumn");
     this.world.dispose();
@@ -381,7 +395,7 @@ export class Game {
     if (this.state === "gameover") {
       if ((code === "Space" || code === "Enter") && !this.ui.isButtonFocused()) {
         event.preventDefault();
-        this.startRun();
+        this.startRun(this.practiceBiome);
       }
       return;
     }
@@ -471,7 +485,7 @@ export class Game {
       } else if (event.type === "bump") {
         this.audio.bump();
       } else if (event.type === "coin") {
-        if (!this.debugRun) {
+        if (!this.debugRun && !this.practiceBiome) {
           save.data.coins += event.amount;
           save.write();
         }
@@ -487,7 +501,13 @@ export class Game {
           this.ui.showMilestone(milestone * 50);
           this.audio.milestone();
         }
-        if (!this.debugRun && this.score > save.data.best) {
+        if (this.practiceBiome) {
+          if (!this.newBestShown && this.score > this.startingBest) {
+            this.newBestShown = true;
+            this.ui.showNewBestBadge();
+            this.audio.newBest();
+          }
+        } else if (!this.debugRun && this.score > save.data.best) {
           save.data.best = this.score;
           save.write();
           if (!this.newBestShown && this.score > this.startingBest) {
@@ -555,30 +575,51 @@ export class Game {
       this.audio.crash();
     }
 
-    if (!this.debugRun && this.score > save.data.best) {
-      save.data.best = this.score;
-    }
-    if (!this.debugRun) {
+    if (!this.debugRun && !this.practiceBiome) {
+      if (this.score > save.data.best) save.data.best = this.score;
       save.data.runs += 1;
+      save.write();
     }
-    save.write();
   }
 
   private finishDeath(): void {
     if (!this.deathData) return;
     this.state = "gameover";
     this.audio.setMusicDucked(true);
-    const isRecord = this.deathData.score > this.startingBest && this.deathData.score > 0;
+    const score = this.deathData.score;
+
+    if (this.practiceBiome) {
+      const previous = save.data.biomeBests[this.practiceBiome] ?? 0;
+      const isRecord = score > previous && score > 0;
+      const best = Math.max(previous, score);
+      if (isRecord) {
+        save.data.biomeBests[this.practiceBiome] = best;
+        save.write();
+      }
+      this.ui.setPracticeMode(this.practiceBiome, best);
+      this.ui.showGameOver({
+        cause: this.deathData.cause,
+        score,
+        best,
+        runCoins: this.deathData.coins,
+        biomes: this.biomesVisited.size,
+        isRecord,
+        practiceName: BIOMES[this.practiceBiome].name
+      });
+      return;
+    }
+
+    const isRecord = score > this.startingBest && score > 0;
     this.ui.showGameOver({
       cause: this.deathData.cause,
-      score: this.deathData.score,
+      score,
       best: save.data.best,
       runCoins: this.deathData.coins,
       biomes: this.biomesVisited.size,
       isRecord
     });
-    if (!this.debugRun && this.deathData.score > 0) {
-      this.leaderboard.submit(this.deathData.score);
+    if (!this.debugRun && score > 0) {
+      this.leaderboard.submit(score);
     }
   }
 
