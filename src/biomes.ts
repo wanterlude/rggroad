@@ -611,7 +611,7 @@ const BASE_MECHANICS: Record<BaseBiomeId, BiomeMechanics> = {
   forest: { speed: 1.02, road: 0.42, river: 0.22, rail: 0.13, water: "logs", police: false, idle: "eagle", stampede: false, rollers: "log", fallers: "coconut" },
   desert: { speed: 1.08, road: 0.5, river: 0.12, rail: 0.12, water: "crocodile", police: false, idle: "eagle", stampede: false, rollers: "tumbleweed" },
   ocean: { speed: 0.85, road: 0.2, river: 0.4, rail: 0.04, water: "logs", police: false, idle: "eagle", stampede: false, tide: true },
-  frost: { speed: 1.06, road: 0.38, river: 0.26, rail: 0.12, water: "ice", police: false, idle: "eagle", stampede: false, slide: true, fragile: "void", fallers: "coconut" },
+  frost: { speed: 1.06, road: 0.38, river: 0.26, rail: 0.12, water: "ice", police: false, idle: "eagle", stampede: false, slide: true, fragile: "void", fallers: "coconut", sink: true, wind: true },
   lava: { speed: 1.25, road: 0.42, river: 0.23, rail: 0.13, water: "logs", police: false, idle: "eagle", stampede: false, geysers: true },
   void: { speed: 1.32, road: 0.43, river: 0.24, rail: 0.14, water: "ice", police: false, idle: "ufo", stampede: false, fragile: "void", sink: true, rollers: "tumbleweed" }
 };
@@ -817,7 +817,7 @@ const NEW_BIOMES: Record<NewBiomeId, BiomeDef> = {
       { kind: "tuft", weight: 0.2 },
       { kind: "mushroom", weight: 0.4 }
     ],
-    mechanics: { speed: 0.98, road: 0.36, river: 0.32, rail: 0.1, water: "chocolate", police: false, idle: "candy-plane", stampede: false, belts: true, fragile: "ghost", fallers: "coconut" }
+    mechanics: { speed: 0.98, road: 0.36, river: 0.32, rail: 0.1, water: "chocolate", police: false, idle: "candy-plane", stampede: false, belts: true, fragile: "ghost", fallers: "coconut", sink: true, geysers: true }
   }),
   prehistoric: variant("prehistoric", "ДОИСТОРИЯ", "forest", {
     grass: [0x78a04a, 0x6f9443, 0x83ac53],

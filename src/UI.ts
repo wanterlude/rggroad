@@ -138,7 +138,7 @@ export class UI {
     });
     refs.nicknameGuestBtn.addEventListener("click", () => {
       handlers.onLeaderboardGuest();
-      this.closeNickname();
+      this.closeNickname(true);
     });
     refs.pauseSoundBtn.setAttribute("aria-pressed", "false");
     refs.pauseMusicBtn.setAttribute("aria-pressed", "false");

@@ -174,7 +174,6 @@ const fragileTileGeometry = new THREE.BoxGeometry(0.94, 0.06, 0.94);
 const fragileHoleGeometry = new THREE.PlaneGeometry(0.94, 0.94);
 const fragileCrackGeometry = new THREE.BoxGeometry(0.04, 0.02, 0.62);
 const coconutGeometry = new THREE.IcosahedronGeometry(0.32, 0);
-const coconutMaterial = new THREE.MeshLambertMaterial({ color: 0x6b4a2c, flatShading: true });
 const coconutStemGeometry = new THREE.BoxGeometry(0.07, 0.13, 0.07);
 const fallerShadowGeometry = new THREE.CircleGeometry(0.42, 18);
 const fallerShadowMaterial = new THREE.MeshBasicMaterial({
@@ -1677,14 +1676,25 @@ export class World {
     warnRing.position.z = 0.002;
     shadow.add(warnRing);
     const nut = new THREE.Group();
-    const shell = new THREE.Mesh(coconutGeometry, coconutMaterial);
-    shell.scale.setScalar(1.2);
-    const stem = new THREE.Mesh(
-      coconutStemGeometry,
-      new THREE.MeshLambertMaterial({ color: 0x4f8b3e })
+    const fallerColor =
+      row.biome === "frost" ? 0xd9f4ff :
+      row.biome === "candy" ? 0xff6f9f :
+      row.biome === "void" ? 0xc48bff :
+      0x6b4a2c;
+    const shell = new THREE.Mesh(
+      coconutGeometry,
+      new THREE.MeshLambertMaterial({ color: fallerColor })
     );
-    stem.position.y = 0.4;
-    nut.add(shell, stem);
+    shell.scale.setScalar(1.2);
+    nut.add(shell);
+    if (row.biome !== "frost" && row.biome !== "candy" && row.biome !== "void") {
+      const stem = new THREE.Mesh(
+        coconutStemGeometry,
+        new THREE.MeshLambertMaterial({ color: 0x4f8b3e })
+      );
+      stem.position.y = 0.4;
+      nut.add(stem);
+    }
     nut.position.set(faller.x, 6, 0);
     nut.visible = false;
     row.group.add(shadow, nut);
@@ -2674,6 +2684,15 @@ export class World {
   private updateDemoBot(dt: number): void {
     const p = this.player;
     if (p.hopping || p.dead) return;
+
+    // Anti-eagle insurance: never let the autopilot stand still for 4 s.
+    // Prefer a side step, then forward/backward, but only onto a cell that is
+    // safe for the current traffic/log/geyser phase.
+    if (this.idleTime >= 3.5 && this.emergencyBotMove()) {
+      this.demoMoveTimer = 0.1;
+      return;
+    }
+
     this.demoMoveTimer -= dt;
     if (this.demoMoveTimer > 0) return;
 
@@ -2738,6 +2757,40 @@ export class World {
     } else if (!this.tryMove(0, 1)) {
       this.demoMoveTimer = 0.05;
     }
+  }
+
+  private botLandingSafe(dx: number, dz: number): boolean {
+    const targetX = this.player.x + dx;
+    const targetZ = Math.round(this.player.z) + dz;
+    const row = this.rows.get(targetZ);
+    if (!row) return false;
+    const landing = this.time + this.demoHopSeconds();
+    if (row.type === "road") {
+      return this.demoRoadSafe(row, targetX, this.time, landing);
+    }
+    if (row.type === "rail") {
+      return this.demoTrainSafe(row, landing);
+    }
+    if (row.type === "water") {
+      return this.demoLogAt(row, targetX, landing) !== null;
+    }
+    return this.demoGrassSafe(row, targetX, landing);
+  }
+
+  /** Last-resort safe hop for a stalled autopilot. */
+  private emergencyBotMove(): boolean {
+    for (const [dx, dz] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+      [2, 0],
+      [-2, 0],
+      [0, 2]
+    ]) {
+      if (this.botLandingSafe(dx, dz) && this.tryMove(dx, dz)) return true;
+    }
+    return false;
   }
 
   /**
