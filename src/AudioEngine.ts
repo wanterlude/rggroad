@@ -1,6 +1,7 @@
 import { clamp } from "./utils";
 import { save } from "./save";
 import type { BiomeId } from "./biomes";
+import { MENU_THEME } from "./assets/music/menuTheme";
 
 type Bus = "sfx" | "music";
 
@@ -73,6 +74,11 @@ export class AudioEngine {
   private master: GainNode | null = null;
   private sfxGain: GainNode | null = null;
   private musicGain: GainNode | null = null;
+  private menuGain: GainNode | null = null;
+  private menuBuffer: AudioBuffer | null = null;
+  private menuSource: AudioBufferSourceNode | null = null;
+  private menuMode = true;
+  private menuLoading = false;
   private musicDucked = false;
   private noiseBuffer: AudioBuffer | null = null;
   private musicTimer: number | null = null;
@@ -83,6 +89,7 @@ export class AudioEngine {
   private currentBiome: BiomeId = "autumn";
   muted = save.data.muted;
   musicMuted = save.data.musicMuted;
+  musicVolume = save.data.musicVolume;
 
   init(): boolean {
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -112,12 +119,16 @@ export class AudioEngine {
       this.sfxGain.connect(this.master);
 
       this.musicGain = ctx.createGain();
-      this.musicGain.gain.value = this.musicMuted ? 0 : 0.42;
+      this.musicGain.gain.value = this.musicMuted ? 0 : 0.42 * this.musicVolume;
       this.musicGain.connect(this.master);
+
+      this.menuGain = ctx.createGain();
+      this.menuGain.gain.value = this.musicMuted ? 0 : this.musicVolume;
+      this.menuGain.connect(this.master);
 
       this.noiseBuffer = this.makeNoise(ctx);
       this.ready = true;
-      this.startMusic();
+      this.loadMenuTheme();
       if (ctx.state === "suspended") void ctx.resume();
       return true;
     } catch {
@@ -156,6 +167,17 @@ export class AudioEngine {
   }
 
   /** Mute only the music; gameplay SFX stay audible. */
+  getMusicVolume(): number {
+    return this.musicVolume;
+  }
+
+  setMusicVolume(value: number): void {
+    this.musicVolume = Math.min(1, Math.max(0, value));
+    save.data.musicVolume = this.musicVolume;
+    save.write();
+    this.applyMusicGain(0.04);
+  }
+
   setMusicMuted(muted: boolean): void {
     this.musicMuted = muted;
     save.data.musicMuted = muted;
@@ -171,15 +193,71 @@ export class AudioEngine {
 
   private applyMusicGain(smoothing: number): void {
     if (!this.musicGain || !this.ctx) return;
-    const target = this.musicMuted ? 0 : this.musicDucked ? 0.16 : 0.42;
+    const procedural = (this.musicMuted ? 0 : this.musicDucked ? 0.16 : 0.42) * this.musicVolume;
+    const menu = this.musicMuted ? 0 : (this.musicDucked ? 0.35 : 1) * this.musicVolume;
     const now = this.ctx.currentTime;
     this.musicGain.gain.cancelScheduledValues(now);
-    this.musicGain.gain.setTargetAtTime(target, now, smoothing);
+    this.musicGain.gain.setTargetAtTime(procedural, now, smoothing);
+    if (this.menuGain) {
+      this.menuGain.gain.cancelScheduledValues(now);
+      this.menuGain.gain.setTargetAtTime(menu, now, smoothing);
+    }
   }
 
   setMusicDucked(ducked: boolean): void {
     this.musicDucked = ducked;
     this.applyMusicGain(0.14);
+  }
+
+  /** Menu uses a dedicated recorded loop; runs keep procedural biome music. */
+  setMenuMode(menu: boolean): void {
+    this.menuMode = menu;
+    if (menu) {
+      this.stopMusicScheduler();
+      this.playMenuTheme();
+    } else {
+      this.stopMenuTheme();
+      this.startMusic();
+    }
+  }
+
+  private async loadMenuTheme(): Promise<void> {
+    if (!this.ctx || this.menuLoading || this.menuBuffer) return;
+    this.menuLoading = true;
+    try {
+      const response = await fetch(MENU_THEME);
+      const bytes = await response.arrayBuffer();
+      this.menuBuffer = await this.ctx.decodeAudioData(bytes);
+      if (this.menuMode) this.playMenuTheme();
+    } catch {
+      // Fall back to the procedural theme if decoding fails.
+      this.menuMode = false;
+      this.startMusic();
+    } finally {
+      this.menuLoading = false;
+    }
+  }
+
+  private playMenuTheme(): void {
+    if (!this.ctx || !this.menuGain || !this.menuBuffer) return;
+    this.stopMenuTheme();
+    const source = this.ctx.createBufferSource();
+    source.buffer = this.menuBuffer;
+    source.loop = true;
+    source.connect(this.menuGain);
+    source.start(0);
+    this.menuSource = source;
+  }
+
+  private stopMenuTheme(): void {
+    if (!this.menuSource) return;
+    try {
+      this.menuSource.stop();
+    } catch {
+      // already stopped
+    }
+    this.menuSource.disconnect();
+    this.menuSource = null;
   }
 
   /**
@@ -193,7 +271,7 @@ export class AudioEngine {
     this.musicTheme = MUSIC_THEMES[biome] ?? DEFAULT_THEME;
     if (!this.ctx || !this.musicGain || this.musicMuted) return;
     const now = this.ctx.currentTime;
-    const target = this.musicDucked ? 0.16 : 0.42;
+    const target = (this.musicDucked ? 0.16 : 0.42) * this.musicVolume;
     this.musicGain.gain.cancelScheduledValues(now);
     this.musicGain.gain.setTargetAtTime(target * 0.58, now, 0.035);
     this.musicGain.gain.setTargetAtTime(target, now + 0.5, 0.14);
@@ -386,8 +464,15 @@ export class AudioEngine {
     });
   }
 
+  private stopMusicScheduler(): void {
+    if (this.musicTimer !== null) {
+      window.clearInterval(this.musicTimer);
+      this.musicTimer = null;
+    }
+  }
+
   private startMusic(): void {
-    if (!this.ctx || this.musicTimer !== null) return;
+    if (!this.ctx || this.musicTimer !== null || this.menuMode) return;
     this.nextNoteTime = this.ctx.currentTime + 0.15;
     this.musicStep = 0;
     this.musicTimer = window.setInterval(() => this.scheduleMusic(), 60);

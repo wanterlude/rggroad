@@ -14,6 +14,8 @@ export interface SaveData {
   favorites: SkinId[];
   muted: boolean;
   musicMuted: boolean;
+  /** 0..1, applied to all music. */
+  musicVolume: number;
   runs: number;
   /** 2 = first five heroes are free, the rest cost 10 coins. */
   economyVersion: number;

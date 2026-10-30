@@ -142,13 +142,18 @@
                 <span class="music-glyph" aria-hidden="true">♪</span>
                 <span id="menuMusicLabel">МУЗЫКА ВКЛ</span>
               </button>
+              <label class="volume-control" for="menuMusicVolume">
+                <span class="volume-label">ГРОМКОСТЬ</span>
+                <input id="menuMusicVolume" type="range" min="0" max="100" step="1" value="80" aria-label="Громкость музыки">
+                <output id="menuMusicVolumeLabel" for="menuMusicVolume">80%</output>
+              </label>
             </div>
             <span class="menu-tip">Собирай монеты · Берегись поездов · Не задерживайся — прилетит орёл</span>
           </div>
         </div>
 
         <div class="menu-credit" aria-label="Создатель игры: wanterlude">wanterlude</div>
-        <div id="menuVersion" class="menu-version" aria-label="Версия игры">v0.2.2</div>
+        <div id="menuVersion" class="menu-version" aria-label="Версия игры">v0.3.0</div>
       </section>
 
       <div id="nicknameModal" class="nickname-modal hidden" aria-hidden="true">

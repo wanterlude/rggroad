@@ -16,6 +16,7 @@ interface UIHandlers {
   onMenu: () => void;
   onSound: () => void;
   onMusic: () => void;
+  onMusicVolume: (value: number) => void;
   onSkin: (skin: SkinId) => void;
   onFavorite: (skin: SkinId) => void;
   onSeason: () => void;
@@ -86,6 +87,8 @@ export class UI {
     menuMusicLabel: $("menuMusicLabel"),
     pauseMusicLabel: $("pauseMusicLabel"),
     menuMusicBtn: $<HTMLButtonElement>("menuMusicBtn"),
+    menuMusicVolume: $<HTMLInputElement>("menuMusicVolume"),
+    menuMusicVolumeLabel: $("menuMusicVolumeLabel"),
     pauseMusicBtn: $<HTMLButtonElement>("pauseMusicBtn"),
     playBtn: $<HTMLButtonElement>("playBtn"),
     pauseBtn: $<HTMLButtonElement>("pauseBtn"),
@@ -125,6 +128,10 @@ export class UI {
     refs.menuSoundBtn.addEventListener("click", () => handlers.onSound());
     refs.pauseSoundBtn.addEventListener("click", () => handlers.onSound());
     refs.menuMusicBtn.addEventListener("click", () => handlers.onMusic());
+    refs.menuMusicVolume.addEventListener("input", () => {
+      handlers.onMusicVolume(Number(refs.menuMusicVolume.value) / 100);
+      this.updateMusicVolumeUI(Number(refs.menuMusicVolume.value) / 100);
+    });
     refs.pauseMusicBtn.addEventListener("click", () => handlers.onMusic());
     refs.seasonChip.addEventListener("click", () => handlers.onSeason());
     refs.leaderboardRefresh.addEventListener("click", () => handlers.onLeaderboardRefresh());
@@ -534,7 +541,7 @@ export class UI {
     this.refs.bestValue.textContent = fmt(save.data.best);
   }
 
-  updateSoundUI(muted: boolean, musicMuted: boolean): void {
+  updateSoundUI(muted: boolean, musicMuted: boolean, musicVolume = 0.8): void {
     const soundLabel = muted ? "ЗВУКИ ВЫКЛ" : "ЗВУКИ ВКЛ";
     const musicLabel = musicMuted ? "МУЗЫКА ВЫКЛ" : "МУЗЫКА ВКЛ";
     this.refs.menuSoundLabel.textContent = soundLabel;
@@ -545,6 +552,15 @@ export class UI {
     this.refs.pauseSoundBtn.setAttribute("aria-pressed", String(muted));
     this.refs.menuMusicBtn.setAttribute("aria-pressed", String(musicMuted));
     this.refs.pauseMusicBtn.setAttribute("aria-pressed", String(musicMuted));
+    this.updateMusicVolumeUI(musicVolume);
+  }
+
+  updateMusicVolumeUI(value: number): void {
+    const percent = Math.round(Math.min(1, Math.max(0, value)) * 100);
+    this.refs.menuMusicVolume.value = String(percent);
+    this.refs.menuMusicVolume.style.setProperty("--volume-fill", `${percent}%`);
+    this.refs.menuMusicVolumeLabel.textContent = `${percent}%`;
+    this.refs.menuMusicVolume.setAttribute("aria-valuetext", `${percent}%`);
   }
 
   showNewBestBadge(): void {

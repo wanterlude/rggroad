@@ -14,6 +14,7 @@ const defaults: SaveData = {
   favorites: [],
   muted: false,
   musicMuted: false,
+  musicVolume: 0.8,
   runs: 0,
   economyVersion: ECONOMY_VERSION
 };
@@ -54,6 +55,9 @@ function sanitize(raw: unknown): SaveData {
 
   data.muted = src.muted === true;
   data.musicMuted = src.musicMuted === true;
+  if (typeof src.musicVolume === "number" && Number.isFinite(src.musicVolume)) {
+    data.musicVolume = Math.min(1, Math.max(0, src.musicVolume));
+  }
   data.economyVersion = ECONOMY_VERSION;
   return data;
 }

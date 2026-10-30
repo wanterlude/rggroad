@@ -1259,6 +1259,68 @@ button:focus-visible {
   flex-wrap: wrap;
 }
 
+.volume-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 142px;
+  color: var(--cream);
+  font-family: var(--ui-font);
+}
+
+.volume-label {
+  color: rgba(255, 247, 226, 0.72);
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.volume-control input[type="range"] {
+  --volume-fill: 80%;
+  width: 74px;
+  height: 4px;
+  margin: 0;
+  border: 0;
+  border-radius: 999px;
+  outline: none;
+  background: linear-gradient(
+    to right,
+    var(--yellow) 0 var(--volume-fill),
+    rgba(255, 247, 226, 0.24) var(--volume-fill) 100%
+  );
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  border: 2px solid #fff8e1;
+  border-radius: 50%;
+  background: var(--yellow);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.volume-control input[type="range"]::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: 2px solid #fff8e1;
+  border-radius: 50%;
+  background: var(--yellow);
+}
+
+.volume-control output {
+  min-width: 31px;
+  color: var(--yellow);
+  font-size: 8px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .music-glyph {
   display: inline-block;
   font-size: 14px;
@@ -1298,6 +1360,12 @@ button:focus-visible {
     font-size: 9px;
     letter-spacing: 0.12em;
     bottom: calc(7px + var(--safe-bottom));
+  }
+}
+
+@media (max-width: 720px) {
+  .menu-credit {
+    display: none;
   }
 }
 
