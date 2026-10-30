@@ -287,7 +287,12 @@ export class UI {
       top.forEach((entry, index) => {
         const row = document.createElement("li");
         row.className = "leaderboard-row";
-        if (entry.id === state.playerId) row.classList.add("is-self");
+        if (
+          entry.id === state.playerId ||
+          entry.name.trim().toLocaleLowerCase("ru") === state.playerName.trim().toLocaleLowerCase("ru")
+        ) {
+          row.classList.add("is-self");
+        }
         row.dataset.rank = String(index + 1);
         const rank = document.createElement("span");
         rank.className = "leaderboard-rank";

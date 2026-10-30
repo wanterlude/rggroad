@@ -25,6 +25,8 @@ export interface LeaderboardState {
 const ID_KEY = "rggroad.lb.id";
 const NAME_KEY = "rggroad.lb.name";
 const TOP = 25;
+// Read extra rows so duplicate nicknames do not shrink the visible top 25.
+const FETCH_LIMIT = 100;
 
 function readStorage(key: string): string {
   try {
@@ -177,7 +179,7 @@ export class Leaderboard {
     this.emit();
     const query =
       `${this.dbUrl}/leaderboard.json` +
-      `?orderBy=${encodeURIComponent('"score"')}&limitToLast=${TOP}`;
+      `?orderBy=${encodeURIComponent('"score"')}&limitToLast=${FETCH_LIMIT}`;
     void this.fetchJson<Record<string, Omit<LeaderboardEntry, "id">> | null>(query)
       .then((data) => {
         if (seq !== this.requestSeq) return;
@@ -218,7 +220,23 @@ export class Leaderboard {
           }
         }
         entries.sort((a, b) => b.score - a.score || a.ts - b.ts);
-        this.entries = entries.slice(0, TOP);
+        // One place per nickname: keep that nickname's best score. Firebase
+        // keeps every device record, but the in-game table is a player table.
+        const bestByName = new Map<string, LeaderboardEntry>();
+        for (const entry of entries) {
+          const key = entry.name.trim().toLocaleLowerCase("ru");
+          const previous = bestByName.get(key);
+          if (
+            !previous ||
+            entry.score > previous.score ||
+            (entry.score === previous.score && entry.ts < previous.ts)
+          ) {
+            bestByName.set(key, entry);
+          }
+        }
+        this.entries = [...bestByName.values()]
+          .sort((a, b) => b.score - a.score || a.ts - b.ts)
+          .slice(0, TOP);
         this.status = "ready";
         this.emit();
       })
