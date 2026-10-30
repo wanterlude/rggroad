@@ -5,7 +5,7 @@ export type LeaderboardStatus = "unconfigured" | "loading" | "ready" | "offline"
 export interface LeaderboardEntry {
   id: string;
   name: string;
-  /** Display title; includes the run date for new records. */
+  /** Stored in Firebase only; the in-game table shows the clean name. */
   title?: string;
   runDate?: string;
   runTime?: string;
@@ -24,7 +24,7 @@ export interface LeaderboardState {
 
 const ID_KEY = "rggroad.lb.id";
 const NAME_KEY = "rggroad.lb.name";
-const TOP = 10;
+const TOP = 25;
 
 function readStorage(key: string): string {
   try {

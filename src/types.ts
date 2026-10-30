@@ -182,6 +182,7 @@ export interface FragileTileData {
   kind: FragileKind;
   state: "idle" | "warning" | "gone";
   timer: number;
+  warn?: number;
   tile?: THREE.Mesh;
   crack?: THREE.Group;
   hole?: THREE.Mesh;

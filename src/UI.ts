@@ -282,7 +282,7 @@ export class UI {
     this.lastLeaderboard = state;
     const list = this.refs.leaderboardList;
     list.innerHTML = "";
-    const top = state.entries.slice(0, 5);
+    const top = state.entries.slice(0, 25);
     if (top.length > 0) {
       top.forEach((entry, index) => {
         const row = document.createElement("li");
@@ -294,8 +294,8 @@ export class UI {
         rank.textContent = String(index + 1);
         const name = document.createElement("span");
         name.className = "leaderboard-name";
-        name.textContent = entry.title ?? entry.name;
-        name.title = entry.title ?? entry.name;
+        name.textContent = entry.name;
+        name.title = entry.name;
         const score = document.createElement("span");
         score.className = "leaderboard-score";
         score.textContent = fmt(entry.score);

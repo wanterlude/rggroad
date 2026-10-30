@@ -82,6 +82,54 @@ const VEHICLE_WEIGHTS = [
   { key: "decker" as VehicleType, weight: 0.8 }
 ];
 
+/**
+ * Target difficulty curve from the design brief. The value is the desired
+ * pressure of the biome, from 4 (autumn tutorial) to 90 (void finale).
+ * Everything below derives its density/speed from this single curve.
+ */
+const BIOME_TARGET: Record<BiomeId, number> = {
+  autumn: 4,
+  forest: 8,
+  ocean: 15,
+  swamp: 21,
+  savanna: 26,
+  desert: 28,
+  frost: 29,
+  candy: 31,
+  jungle: 33,
+  city: 40,
+  prehistoric: 50,
+  halloween: 60,
+  lava: 70,
+  ashlands: 82.5,
+  space: 86,
+  void: 90,
+  storm: 22,
+  flood: 15,
+  crossroads: 35
+};
+
+const HAZARD_TUNE: Partial<Record<BiomeId, number>> = {
+  autumn: 0.2,
+  forest: 1.4,
+  ocean: 0.8,
+  swamp: 1.65,
+  savanna: 1.07,
+  desert: 0.9,
+  frost: 1.04,
+  candy: 1.4,
+  jungle: 1.4,
+  city: 1.15,
+  prehistoric: 1.05,
+  halloween: 0.51,
+  lava: 0.8,
+  ashlands: 0.9,
+  space: 1.15,
+  void: 0.62
+};
+
+
+
 const DEMO_BIOME_SPAN = 15;
 const DEMO_PLAN_STEP = 0.05;
 const DEMO_PLAN_MAX_STEPS = 120;
@@ -408,6 +456,27 @@ export class World {
     return this.biomeAt(z).mechanics ?? DEFAULT_MECHANICS;
   }
 
+  private targetAt(z: number): number {
+    return BIOME_TARGET[this.biomeAt(z).id] ?? 4;
+  }
+
+  private riskAt(z: number): number {
+    return this.targetAt(z) / 100;
+  }
+
+  private tuneAt(z: number): number {
+    return HAZARD_TUNE[this.biomeAt(z).id] ?? 1;
+  }
+
+  private pressureAt(z: number): number {
+    return (0.2 + this.riskAt(z) * 3.7) * this.tuneAt(z);
+  }
+
+  /** 0 at the bank, 1 after row 95, multiplied by the biome target. */
+  private difficultyAt(z: number): number {
+    return clamp(z / 95, 0, 1) * this.pressureAt(z);
+  }
+
   getScore(): number {
     return this.maxZ;
   }
@@ -620,7 +689,7 @@ export class World {
     if (segment.kind === "main" && z - segment.start < 2) return "bank";
 
     const r = this.rng();
-    const d = clamp(z / 95, 0, 1);
+    const d = this.difficultyAt(z);
     if (z < 6) return "road";
     if (z < 12) {
       if (r < 0.58) return "road";
@@ -659,7 +728,7 @@ export class World {
   }
 
   private addFloodRow(z: number): void {
-    const d = clamp(z / 95, 0, 1);
+    const d = this.difficultyAt(z);
     const dir: 1 | -1 = this.rng() < 0.5 ? 1 : -1;
     const speed = rr(this.rng, 0.85, 1.6) * (1 + d * 0.3);
     this.attachRow(this.makeWaterRow(z, dir, speed, d));
@@ -667,9 +736,10 @@ export class World {
   }
 
   private addCrossroadRow(z: number): void {
-    const d = clamp(z / 95, 0, 1);
+    const d = this.difficultyAt(z);
     const dir: 1 | -1 = this.rng() < 0.5 ? 1 : -1;
-    const speed = rr(this.rng, 1.9, 3.0) * (1 + d * 0.5) * this.mechanicsAt(z).speed;
+    const speed =
+      rr(this.rng, 1.9, 3.0) * (1 + d * 0.5) * this.mechanicsAt(z).speed;
     this.attachRow(this.makeRoadRow(z, dir, speed, d));
     this.frontier = z;
   }
@@ -683,7 +753,7 @@ export class World {
   }
 
   private addRoadSegment(z: number): void {
-    const d = clamp(z / 95, 0, 1);
+    const d = this.difficultyAt(z);
     const width = Math.min(
       clamp(1 + Math.floor(this.rng() * (1.45 + d * 2.2)), 1, 4),
       this.segmentRoom(z)
@@ -691,7 +761,10 @@ export class World {
     const baseDir: 1 | -1 = this.rng() < 0.5 ? 1 : -1;
     for (let i = 0; i < width; i++) {
       const dir: 1 | -1 = i % 2 === 0 ? baseDir : baseDir === 1 ? -1 : 1;
-      const speed = rr(this.rng, 1.9, 3.2) * (1 + d * 0.62) * this.mechanicsAt(z + i).speed;
+      const speed =
+        rr(this.rng, 1.9, 3.2) *
+        (1 + d * 0.62) *
+        this.mechanicsAt(z + i).speed;
       this.attachRow(this.makeRoadRow(z + i, dir, speed, d));
     }
     this.frontier = z + width - 1;
@@ -699,7 +772,7 @@ export class World {
   }
 
   private addRiverSegment(z: number): void {
-    const d = clamp(z / 95, 0, 1);
+    const d = this.difficultyAt(z);
     const width = Math.min(
       clamp(1 + Math.floor(this.rng() * (1.05 + d * 1.45)), 1, 3),
       this.segmentRoom(z)
@@ -715,7 +788,7 @@ export class World {
   }
 
   private addRailSegment(z: number): void {
-    const d = clamp(z / 95, 0, 1);
+    const d = this.difficultyAt(z);
     this.attachRow(this.makeRailRow(z, d));
     this.frontier = z;
     this.addSpacer(z + 1);
@@ -741,29 +814,34 @@ export class World {
     row.variant = Math.floor(this.rng() * 4);
     this.addDecor(row);
     const mechanics = this.mechanicsAt(z);
+    const risk = this.riskAt(z);
+    const tune = this.tuneAt(z);
+    const chance = (base: number) => Math.min(0.98, base * tune);
     // Keep roller and conveyor rows free of solid props: the hazard crosses
     // the whole lawn, and clipping through a tree trunk looks broken.
     const rollerKind =
-      mechanics.rollers && this.mode !== "menu" && this.rng() < 0.36 ? mechanics.rollers : null;
-    const belt = mechanics.belts && this.mode !== "menu" && this.rng() < 0.45;
+      mechanics.rollers && this.mode !== "menu" && this.rng() < chance(0.2 + risk * 0.75)
+        ? mechanics.rollers
+        : null;
+    const belt = mechanics.belts && this.mode !== "menu" && this.rng() < chance(0.3 + risk * 0.4);
     if (options.allowProps && !rollerKind && !belt) this.addProps(row);
-    if (mechanics.geysers && this.mode !== "menu" && this.rng() < 0.78) {
+    if (mechanics.geysers && this.mode !== "menu" && this.rng() < chance(0.3 + risk * 0.65)) {
       this.addGeysers(row);
     }
     if (rollerKind) this.addRoller(row, rollerKind);
-    if (mechanics.fragile && this.mode !== "menu" && this.rng() < 0.5) {
+    if (mechanics.fragile && this.mode !== "menu" && this.rng() < chance(0.15 + risk * 0.85)) {
       this.addFragile(row, mechanics.fragile);
     }
-    if (mechanics.fallers && this.mode !== "menu" && this.rng() < 0.48) {
+    if (mechanics.fallers && this.mode !== "menu" && this.rng() < chance(0.2 + risk * 0.7)) {
       this.addFaller(row);
     }
     if (mechanics.leafPiles && this.mode !== "menu" && this.rng() < 0.55) {
       this.addLeafPiles(row);
     }
-    if (mechanics.tarPits && this.mode !== "menu" && this.rng() < 0.6) {
+    if (mechanics.tarPits && this.mode !== "menu" && this.rng() < chance(0.2 + risk * 0.8)) {
       this.addTarPit(row);
     }
-    if (mechanics.sink && options.allowProps && this.mode !== "menu" && this.rng() < 0.58) {
+    if (mechanics.sink && options.allowProps && this.mode !== "menu" && this.rng() < chance(0.2 + risk * 0.8)) {
       this.addSinkholes(row);
     }
     if (belt) this.addBelt(row);
@@ -788,7 +866,8 @@ export class World {
   }
 
   private addTarPit(row: Row): void {
-    const count = this.rng() < 0.65 ? 1 : 2;
+    const count =
+      (this.rng() < 0.65 ? 1 : 2) + Math.floor(this.riskAt(row.z) * 7 * this.tuneAt(row.z));
     const lane = [-3, -2, -1, 0, 1, 2, 3];
     this.shuffleLane(lane);
     const pits: TarPitData[] = [];
@@ -803,7 +882,8 @@ export class World {
   }
 
   private addSinkholes(row: Row): void {
-    const count = this.rng() < 0.7 ? 1 : 2;
+    const count =
+      (this.rng() < 0.7 ? 1 : 2) + Math.floor(this.riskAt(row.z) * 5 * this.tuneAt(row.z));
     const lanes = [-3, -2, -1, 0, 1, 2, 3];
     this.shuffleLane(lanes);
     const holes: SinkholeData[] = [];
@@ -875,7 +955,8 @@ export class World {
 
   /** Jungle: a coconut drops onto a cell after its shadow has grown. */
   private addFaller(row: Row): void {
-    const count = this.rng() < 0.55 ? 1 : 2;
+    const count =
+      (this.rng() < 0.55 ? 1 : 2) + Math.floor(this.riskAt(row.z) * 10 * this.tuneAt(row.z));
     const lane = [-3, -2, -1, 0, 1, 2, 3];
     for (let i = lane.length - 1; i > 0; i--) {
       const j = Math.floor(this.rng() * (i + 1));
@@ -891,7 +972,8 @@ export class World {
       if ((row.rollers ?? []).some((roller) => Math.abs(roller.x - x) < roller.radius + 0.6)) continue;
       if ((row.fragile ?? []).some((tile) => Math.abs(tile.x - x) < 0.8)) continue;
       const period =
-        FALLER_WARN_SECONDS + FALLER_FALL_SECONDS + FALLER_IMPACT_SECONDS + 2.4 + this.rng() * 1.5;
+        (FALLER_WARN_SECONDS + FALLER_FALL_SECONDS + FALLER_IMPACT_SECONDS + 2.4 + this.rng() * 1.5) /
+        this.pressureAt(row.z);
       fallers.push({
         x,
         period,
@@ -905,7 +987,9 @@ export class World {
 
   /** Void and Halloween ground plates that crack and drop out from under you. */
   private addFragile(row: Row, kind: FragileKind): void {
-    const count = this.rng() < 0.6 ? 1 : 2;
+    const count =
+      (this.rng() < 0.6 ? 1 : 2) +
+      Math.floor(this.riskAt(row.z) * 5 * this.tuneAt(row.z));
     const lane = [-3, -2, -1, 0, 1, 2, 3];
     for (let i = lane.length - 1; i > 0; i--) {
       const j = Math.floor(this.rng() * (i + 1));
@@ -914,11 +998,12 @@ export class World {
       lane[j] = swap;
     }
     const tiles: FragileTileData[] = [];
+    const warn = clamp(0.35 + (1 - this.riskAt(row.z)) * 0.8, 0.35, 1.2);
     for (const x of lane) {
       if (tiles.length >= count) break;
       if (row.props.some((prop) => prop.collider && Math.abs(prop.x - x) < prop.radius + 0.55)) continue;
       if ((row.geysers ?? []).some((geyser) => Math.abs(geyser.x - x) < 0.8)) continue;
-      tiles.push({ x, kind, state: "idle", timer: 0 });
+      tiles.push({ x, kind, state: "idle", timer: 0, warn });
     }
     if (tiles.length > 0) row.fragile = tiles;
   }
@@ -927,9 +1012,10 @@ export class World {
   private addRoller(row: Row, kind: RollerKind): void {
     const dir: 1 | -1 = this.rng() < 0.5 ? 1 : -1;
     const edge = HALF_SPAN + 7;
+    const pressure = this.pressureAt(row.z);
     if (kind === "beast") {
       const count = 2 + Math.floor(this.rng() * 2);
-      const speed = rr(this.rng, 2.4, 3.6);
+      const speed = rr(this.rng, 2.4, 3.6) * pressure;
       const herd: RollerData[] = [];
       for (let i = 0; i < count; i++) {
         herd.push({
@@ -948,7 +1034,7 @@ export class World {
       {
         x: -dir * edge,
         dir,
-        speed: rr(this.rng, 3.4, 5.4),
+        speed: rr(this.rng, 3.4, 5.4) * pressure,
         radius: kind === "log" ? 0.55 : 0.42,
         kind,
         phase: this.rng() * Math.PI * 2
@@ -958,7 +1044,9 @@ export class World {
 
   /** Lava ground vents. They sit on walkable cells and telegraph before firing. */
   private addGeysers(row: Row): void {
-    const count = this.rng() < 0.55 ? 1 : 2;
+    const count =
+      (this.rng() < 0.55 ? 1 : 2) +
+      Math.floor(this.riskAt(row.z) * 8 * this.tuneAt(row.z));
     const lane = [-3, -2, -1, 0, 1, 2, 3];
     for (let i = lane.length - 1; i > 0; i--) {
       const j = Math.floor(this.rng() * (i + 1));
@@ -967,13 +1055,14 @@ export class World {
       lane[j] = swap;
     }
     const geysers: GeyserData[] = [];
+    const pressure = this.pressureAt(row.z);
     for (const x of lane) {
       if (geysers.length >= count) break;
       if (row.props.some((prop) => prop.collider && Math.abs(prop.x - x) < prop.radius + 0.55)) continue;
       geysers.push({
         x,
         phase: this.rng() * 6,
-        period: 4.6 + this.rng() * 1.4
+        period: (4.6 + this.rng() * 1.4) / pressure
       });
     }
     if (geysers.length > 0) row.geysers = geysers;
@@ -1989,7 +2078,7 @@ export class World {
         if (fragile.state === "idle") {
           if (on) {
             fragile.state = "warning";
-            fragile.timer = FRAGILE_WARN_SECONDS;
+            fragile.timer = fragile.warn ?? FRAGILE_WARN_SECONDS;
             if (fragile.crack) fragile.crack.visible = true;
           }
           continue;
@@ -1997,7 +2086,7 @@ export class World {
 
         if (fragile.state === "warning") {
           fragile.timer -= dt;
-          const k = clamp(1 - fragile.timer / FRAGILE_WARN_SECONDS, 0, 1);
+          const k = clamp(1 - fragile.timer / (fragile.warn ?? FRAGILE_WARN_SECONDS), 0, 1);
           if (fragile.tile) {
             const material = fragile.tile.material as THREE.MeshLambertMaterial;
             const base = fragile.kind === "void" ? 0x6b6478 : 0x8d7aad;

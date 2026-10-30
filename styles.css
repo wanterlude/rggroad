@@ -3678,12 +3678,35 @@ body.menu-active #game {
   flex-direction: column;
   gap: 2px;
   min-height: 92px;
+  max-height: 112px;
   margin: 0;
-  padding: 0;
+  padding: 0 3px 0 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 210, 63, 0.55) transparent;
+}
+
+.leaderboard-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.leaderboard-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.leaderboard-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 210, 63, 0.55);
+}
+
+.leaderboard-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 210, 63, 0.8);
 }
 
 .leaderboard-row {
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr) auto;
   align-items: center;
@@ -3984,6 +4007,7 @@ body.menu-active #game {
   }
 
   .leaderboard-list {
+    max-height: 140px;
     margin-top: 2px;
   }
 
