@@ -1235,12 +1235,11 @@ export class World {
     const biome = BIOMES[row.biome];
     row.dir = dir;
     row.speed = speed;
-    const gap = rr(this.rng, 4.8, 8.2) - difficulty * 1.7;
     const mechanics = this.mechanicsAt(z);
     const policePossible = mechanics.police;
-    // Leave a safe circular gap at the lane seam. Without this margin the last
-    // car can wrap into the first one and they visibly overlap.
-    const laneMargin = 1.1;
+    // Keep a generous circular gap at the lane seam: the last and first car
+    // wrap into each other, so each side reserves half of the minimum gap.
+    const laneMargin = 2.5;
     let cursor = -HALF_SPAN + laneMargin + rr(this.rng, 0, 0.6);
     let guard = 0;
     while (cursor < HALF_SPAN && guard++ < 20) {
@@ -1269,7 +1268,10 @@ export class World {
         cargo: pick(this.rng, [biome.shell, biome.rockLight, 0xe9edf0, color]),
         police
       });
-      cursor += len + Math.max(2.8, gap + rr(this.rng, -0.7, 0.9));
+      const spacing =
+        Math.max(4.6, rr(this.rng, 5.8, 10.2) - difficulty * 1.4) +
+        rr(this.rng, 0, 1.4);
+      cursor += len + spacing;
     }
     if (row.cars.length === 0) {
       row.cars.push({

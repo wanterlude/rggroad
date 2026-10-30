@@ -1,7 +1,7 @@
 {
   "name": "rgg-road",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "description": "RGG Road — true 3D voxel endless hopper on Three.js.",
   "scripts": {
