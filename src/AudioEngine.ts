@@ -85,6 +85,9 @@ export class AudioEngine {
   private biomeBuffer: BiomeId | null = null;
   private trackCache = new Map<BiomeId, AudioBuffer>();
   private trackRequests = new Map<BiomeId, Promise<AudioBuffer | null>>();
+  private trackBytes = new Map<BiomeId, ArrayBuffer>();
+  private trackByteRequests = new Map<BiomeId, Promise<ArrayBuffer | null>>();
+  private decodedOrder: BiomeId[] = [];
   private trackToken = 0;
   private preloading = false;
   private menuMode = true;
@@ -142,6 +145,7 @@ export class AudioEngine {
 
       this.noiseBuffer = this.makeNoise(ctx);
       this.ready = true;
+      void this.loadBiomeBytes("autumn");
       this.loadMenuTheme();
       if (ctx.state === "suspended") void ctx.resume();
       return true;
@@ -259,6 +263,31 @@ export class AudioEngine {
     }
   }
 
+  private async loadBiomeBytes(biome: BiomeId): Promise<ArrayBuffer | null> {
+    const cached = this.trackBytes.get(biome);
+    if (cached) return cached;
+    const existing = this.trackByteRequests.get(biome);
+    if (existing) return existing;
+
+    const request = (async () => {
+      try {
+        const url = `${import.meta.env.BASE_URL}music/${biome}.ogg`;
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const bytes = await response.arrayBuffer();
+        this.trackBytes.set(biome, bytes);
+        return bytes;
+      } catch {
+        return null;
+      } finally {
+        this.trackByteRequests.delete(biome);
+      }
+    })();
+
+    this.trackByteRequests.set(biome, request);
+    return request;
+  }
+
   private async loadBiomeTrack(biome: BiomeId): Promise<AudioBuffer | null> {
     const cached = this.trackCache.get(biome);
     if (cached) return cached;
@@ -267,13 +296,17 @@ export class AudioEngine {
 
     const request = (async () => {
       if (!this.ctx) return null;
+      const bytes = await this.loadBiomeBytes(biome);
+      if (!bytes) return null;
       try {
-        const url = `${import.meta.env.BASE_URL}music/${biome}.ogg`;
-        const response = await fetch(url);
-        if (!response.ok) return null;
-        const bytes = await response.arrayBuffer();
-        const buffer = await this.ctx.decodeAudioData(bytes);
+        const buffer = await this.ctx.decodeAudioData(bytes.slice(0));
         this.trackCache.set(biome, buffer);
+        this.decodedOrder = this.decodedOrder.filter((id) => id !== biome);
+        this.decodedOrder.push(biome);
+        while (this.decodedOrder.length > 3) {
+          const oldest = this.decodedOrder.shift();
+          if (oldest && oldest !== this.currentBiome) this.trackCache.delete(oldest);
+        }
         return buffer;
       } catch {
         return null;
@@ -289,12 +322,11 @@ export class AudioEngine {
   private async preloadBiomeTracks(): Promise<void> {
     if (this.preloading) return;
     this.preloading = true;
-    // Let the menu theme start first; then warm the short biome loops.
-    await new Promise((resolve) => window.setTimeout(resolve, 1400));
-    for (const biome of BIOME_TRACK_IDS) {
-      if (!this.ctx) break;
-      await this.loadBiomeTrack(biome);
-    }
+    // Fetch compressed bytes in parallel; decode only a few at a time.
+    await new Promise((resolve) => window.setTimeout(resolve, 600));
+    await Promise.all(
+      BIOME_TRACK_IDS.filter((id) => id !== "autumn").map((id) => this.loadBiomeBytes(id))
+    );
   }
 
   private fadeOutMenu(fade: number): void {
