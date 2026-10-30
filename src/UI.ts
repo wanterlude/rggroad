@@ -18,6 +18,7 @@ interface UIHandlers {
   onSound: () => void;
   onMusic: () => void;
   onMusicVolume: (value: number) => void;
+  onGameVolume: (value: number) => void;
   onBiomeMode: () => void;
   onBiomePractice: (biome: BiomeId) => void;
   onSkin: (skin: SkinId) => void;
@@ -102,6 +103,8 @@ export class UI {
     practiceBadgeBest: $("practiceBadgeBest"),
     menuMusicVolume: $<HTMLInputElement>("menuMusicVolume"),
     menuMusicVolumeLabel: $("menuMusicVolumeLabel"),
+    pauseVolume: $<HTMLInputElement>("pauseVolume"),
+    pauseVolumeLabel: $("pauseVolumeLabel"),
     pauseMusicBtn: $<HTMLButtonElement>("pauseMusicBtn"),
     playBtn: $<HTMLButtonElement>("playBtn"),
     pauseBtn: $<HTMLButtonElement>("pauseBtn"),
@@ -165,6 +168,11 @@ export class UI {
       this.updateMusicVolumeUI(Number(refs.menuMusicVolume.value) / 100);
     });
     refs.pauseMusicBtn.addEventListener("click", () => handlers.onMusic());
+    refs.pauseVolume.addEventListener("input", () => {
+      const value = Number(refs.pauseVolume.value) / 100;
+      handlers.onGameVolume(value);
+      this.updateGameVolumeUI(value);
+    });
     refs.seasonChip.addEventListener("click", () => handlers.onSeason());
     refs.leaderboardRefresh.addEventListener("click", () => handlers.onLeaderboardRefresh());
     refs.leaderboardClose.addEventListener("click", () => this.setLeaderboardOpen(false));
@@ -651,7 +659,7 @@ export class UI {
     this.refs.bestValue.textContent = fmt(save.data.best);
   }
 
-  updateSoundUI(muted: boolean, musicMuted: boolean, musicVolume = 0.05): void {
+  updateSoundUI(muted: boolean, musicMuted: boolean, musicVolume = 0.05, gameVolume = 1): void {
     const soundLabel = muted ? "ЗВУКИ ВЫКЛ" : "ЗВУКИ ВКЛ";
     const musicLabel = musicMuted ? "МУЗЫКА ВЫКЛ" : "МУЗЫКА ВКЛ";
     this.refs.menuSoundLabel.textContent = soundLabel;
@@ -663,6 +671,15 @@ export class UI {
     this.refs.menuMusicBtn.setAttribute("aria-pressed", String(musicMuted));
     this.refs.pauseMusicBtn.setAttribute("aria-pressed", String(musicMuted));
     this.updateMusicVolumeUI(musicVolume);
+    this.updateGameVolumeUI(gameVolume);
+  }
+
+  private updateGameVolumeUI(value: number): void {
+    const percent = Math.round(Math.min(1, Math.max(0, value)) * 100);
+    this.refs.pauseVolume.value = String(percent);
+    this.refs.pauseVolume.style.setProperty("--volume-fill", `${percent}%`);
+    this.refs.pauseVolumeLabel.textContent = `${percent}%`;
+    this.refs.pauseVolume.setAttribute("aria-valuetext", `${percent}%`);
   }
 
   updateMusicVolumeUI(value: number): void {

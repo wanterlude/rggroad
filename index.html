@@ -163,7 +163,7 @@
         </div>
 
         <div class="menu-credit" aria-label="Создатель игры: wanterlude">wanterlude</div>
-        <div id="menuVersion" class="menu-version" aria-label="Версия игры">v0.4.5</div>
+        <div id="menuVersion" class="menu-version" aria-label="Версия игры">v0.4.6</div>
       </section>
 
       <div id="nicknameModal" class="nickname-modal hidden" aria-hidden="true">
@@ -208,6 +208,13 @@
               <span class="music-glyph" aria-hidden="true">♪</span>
               <span id="pauseMusicLabel">МУЗЫКА ВКЛ</span>
             </button>
+          </div>
+          <div class="pause-volume-row">
+            <label class="volume-control pause-volume" for="pauseVolume">
+              <span class="volume-label">ГРОМКОСТЬ ИГРЫ</span>
+              <input id="pauseVolume" type="range" min="0" max="100" step="1" value="100" aria-label="Общая громкость игры">
+              <output id="pauseVolumeLabel" for="pauseVolume">100%</output>
+            </label>
           </div>
         </div>
       </section>

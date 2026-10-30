@@ -16,6 +16,8 @@ export interface SaveData {
   musicMuted: boolean;
   /** 0..1, applied to all music. */
   musicVolume: number;
+  /** Master game volume, 0..1. */
+  volume: number;
   runs: number;
   /** 2 = first five heroes are free, the rest cost 10 coins. */
   economyVersion: number;

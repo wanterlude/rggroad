@@ -92,6 +92,7 @@ export class Game {
       onSound: () => this.toggleSound(),
       onMusic: () => this.toggleMusic(),
       onMusicVolume: (value) => this.setMusicVolume(value),
+      onGameVolume: (value) => this.setGameVolume(value),
       onSkin: (skin) => this.selectSkin(skin),
       onFavorite: (skin) => this.toggleFavorite(skin),
       onSeason: () => this.cycleSeason(),
@@ -112,7 +113,7 @@ export class Game {
     this.cameraSnap = true;
     this.bindEvents();
     this.applySeason(season);
-    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted, this.audio.getMusicVolume());
+    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted, this.audio.getMusicVolume(), this.audio.getGameVolume());
     this.ui.showMenu();
     this.ui.updateHUD(0);
     this.updateCamera(0, 0);
@@ -194,7 +195,7 @@ export class Game {
       this.ui.showPlaying();
       this.ui.updateHUD(this.score);
       this.ui.updateStats();
-      this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted, this.audio.getMusicVolume());
+      this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted, this.audio.getMusicVolume(), this.audio.getGameVolume());
       this.announceBiome();
       this.ui.clearFocus();
     }
@@ -235,7 +236,7 @@ export class Game {
     this.ui.showMenu();
     this.ui.updateHUD(0);
     this.ui.updateStats();
-    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted, this.audio.getMusicVolume());
+    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted, this.audio.getMusicVolume(), this.audio.getGameVolume());
     this.ui.renderLeaderboard(this.leaderboard.getState(), save.data.best);
     this.leaderboard.refresh();
     this.ui.clearFocus();
@@ -263,13 +264,19 @@ export class Game {
   private setMusicVolume(value: number): void {
     this.audio.init();
     this.audio.setMusicVolume(value);
-    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted, this.audio.getMusicVolume());
+    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted, this.audio.getMusicVolume(), this.audio.getGameVolume());
+  }
+
+  private setGameVolume(value: number): void {
+    this.audio.init();
+    this.audio.setGameVolume(value);
+    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted, this.audio.getMusicVolume(), this.audio.getGameVolume());
   }
 
   private toggleSound(): void {
     this.audio.init();
     this.audio.toggleMuted();
-    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted, this.audio.getMusicVolume());
+    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted, this.audio.getMusicVolume(), this.audio.getGameVolume());
     if (!this.audio.muted) this.audio.click();
     this.ui.showToast(this.audio.muted ? "Звуки выключены" : "Звуки включены", 1300);
   }
@@ -277,7 +284,7 @@ export class Game {
   private toggleMusic(): void {
     this.audio.init();
     this.audio.toggleMusicMuted();
-    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted, this.audio.getMusicVolume());
+    this.ui.updateSoundUI(this.audio.muted, this.audio.musicMuted, this.audio.getMusicVolume(), this.audio.getGameVolume());
     if (!this.audio.muted) this.audio.click();
     this.ui.showToast(this.audio.musicMuted ? "Музыка выключена" : "Музыка включена", 1300);
   }

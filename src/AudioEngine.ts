@@ -102,6 +102,7 @@ export class AudioEngine {
   muted = save.data.muted;
   musicMuted = save.data.musicMuted;
   musicVolume = save.data.musicVolume;
+  volume = save.data.volume;
 
   init(): boolean {
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -123,7 +124,7 @@ export class AudioEngine {
       compressor.connect(ctx.destination);
 
       this.master = ctx.createGain();
-      this.master.gain.value = 0.82;
+      this.master.gain.value = 0.82 * this.volume;
       this.master.connect(compressor);
 
       this.sfxGain = ctx.createGain();
@@ -184,6 +185,20 @@ export class AudioEngine {
   }
 
   /** Mute only the music; gameplay SFX stay audible. */
+  getGameVolume(): number {
+    return this.volume;
+  }
+
+  setGameVolume(value: number): void {
+    this.volume = Math.min(1, Math.max(0, value));
+    save.data.volume = this.volume;
+    save.write();
+    if (!this.ctx || !this.master) return;
+    const now = this.ctx.currentTime;
+    this.master.gain.cancelScheduledValues(now);
+    this.master.gain.setTargetAtTime(0.82 * this.volume, now, 0.04);
+  }
+
   getMusicVolume(): number {
     return this.musicVolume;
   }

@@ -4360,3 +4360,41 @@ body.menu-active #game {
     width: 100%;
   }
 }
+
+/* Pause: master game volume */
+.pause-volume-row {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(32, 49, 58, 0.14);
+}
+
+.pause-volume {
+  width: 100%;
+  min-width: 0;
+  gap: 9px;
+  color: var(--ink);
+}
+
+.pause-volume .volume-label {
+  flex: 0 0 auto;
+  color: rgba(32, 49, 58, 0.68);
+}
+
+.pause-volume input[type="range"] {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 90px;
+}
+
+.pause-volume output {
+  flex: 0 0 36px;
+  color: var(--ink);
+}
+
+.modal-card .pause-volume input[type="range"] {
+  background: linear-gradient(
+    to right,
+    var(--yellow) 0 var(--volume-fill),
+    rgba(32, 49, 58, 0.2) var(--volume-fill) 100%
+  );
+}

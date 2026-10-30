@@ -16,6 +16,7 @@ const defaults: SaveData = {
   muted: false,
   musicMuted: false,
   musicVolume: 0.05,
+  volume: 1,
   runs: 0,
   economyVersion: ECONOMY_VERSION,
   biomeBests: {}
@@ -69,6 +70,9 @@ function sanitize(raw: unknown): SaveData {
     }
   }
   data.biomeBests = biomeBests;
+  if (typeof src.volume === "number" && Number.isFinite(src.volume)) {
+    data.volume = Math.min(1, Math.max(0, src.volume));
+  }
   data.economyVersion = ECONOMY_VERSION;
   return data;
 }
