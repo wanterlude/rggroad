@@ -440,6 +440,19 @@ export class World {
     return Math.max(1, biomeSegmentAt(Math.max(0, this.player.z)).end);
   }
 
+  /** Upcoming scheduled biomes, used to preload their music ahead of time. */
+  getUpcomingBiomes(count = 2): BiomeId[] {
+    if (this.mode !== "run" || this.forceBiomeId) return [];
+    const result: BiomeId[] = [];
+    let z = this.getNextBiomeBoundary();
+    for (let i = 0; i < count; i++) {
+      const segment = biomeSegmentAt(z);
+      result.push(segment.biome);
+      z = segment.end;
+    }
+    return result;
+  }
+
   private biomeAt(z: number) {
     if (this.forceBiomeId) return BIOMES[this.forceBiomeId];
     if (this.mode !== "demo") return biomeForZ(z);

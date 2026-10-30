@@ -197,6 +197,7 @@ export class Game {
     const biome = this.world.getBiome();
     const elite = this.world.getElite();
     this.audio.setBiome(biome.id);
+    for (const upcoming of this.world.getUpcomingBiomes(2)) this.audio.preloadBiome(upcoming);
     this.ui.setWeather(biome.mechanics?.storm === true);
     this.ui.showBiomeBanner(elite ? `${biome.name} · НОЧЬ` : biome.name, biome.description ?? "");
   }

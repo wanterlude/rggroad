@@ -2,7 +2,6 @@ import { clamp } from "./utils";
 import { save } from "./save";
 import type { BiomeId } from "./biomes";
 import { MENU_THEME } from "./assets/music/menuTheme";
-import { BIOME_TRACK_IDS } from "./music/tracks";
 
 type Bus = "sfx" | "music";
 
@@ -322,11 +321,14 @@ export class AudioEngine {
   private async preloadBiomeTracks(): Promise<void> {
     if (this.preloading) return;
     this.preloading = true;
-    // Fetch compressed bytes in parallel; decode only a few at a time.
-    await new Promise((resolve) => window.setTimeout(resolve, 600));
-    await Promise.all(
-      BIOME_TRACK_IDS.filter((id) => id !== "autumn").map((id) => this.loadBiomeBytes(id))
-    );
+    // The menu only needs the first run track; later tracks are warmed while
+    // the current biome plays, so we do not stall 19 requests on load.
+    await this.loadBiomeBytes("autumn");
+  }
+
+  preloadBiome(biome: BiomeId): void {
+    if (biome === "autumn") return;
+    void this.loadBiomeBytes(biome);
   }
 
   private fadeOutMenu(fade: number): void {
