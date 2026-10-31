@@ -17,6 +17,7 @@ export interface GameBootOptions {
   seed?: number;
   row?: number;
   biome?: BiomeId;
+  difficultyScale?: number;
   bot?: boolean;
   autostart?: boolean;
   /** Suppress the biome-lab auto-start so a harness can drive runs itself. */
@@ -140,7 +141,8 @@ export class Game {
       seed: menu ? undefined : (this.benchSeed ?? this.boot.seed),
       startZ: menu ? undefined : this.boot.row,
       forceBiome: menu ? undefined : (this.practiceBiome ?? this.boot.biome),
-      bot: menu ? undefined : this.boot.bot
+      bot: menu ? undefined : this.boot.bot,
+      difficultyScale: menu ? undefined : this.boot.difficultyScale
     });
   }
 

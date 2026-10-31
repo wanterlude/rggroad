@@ -254,6 +254,7 @@ interface WorldOptions {
   forceBiome?: BiomeId;
   /** Let the autopilot drive the player during a normal run (used by ?bot=1). */
   bot?: boolean;
+  difficultyScale?: number;
 }
 
 export class World {
@@ -294,6 +295,7 @@ export class World {
   private readonly forceBiomeId: BiomeId | null;
   private readonly botEnabled: boolean;
   private readonly debugStart: number;
+  private readonly difficultyScale: number;
 
   constructor(seed: number, options: WorldOptions) {
     this.rng = mulberry32((options.seed ?? seed) >>> 0 || 1);
@@ -301,6 +303,7 @@ export class World {
     this.forceBiomeId = options.forceBiome ?? null;
     this.botEnabled = options.bot === true;
     this.debugStart = options.startZ ?? 0;
+    this.difficultyScale = options.difficultyScale ?? 2.4;
     this.demoBiomeIndex = options.demoBiome ?? 0;
     this.skinId = options.skin;
     this.sceneView = options.sceneView;
@@ -479,7 +482,7 @@ export class World {
   }
 
   private riskAt(z: number): number {
-    return this.targetAt(z) / 100;
+    return clamp((this.targetAt(z) / 100) * this.difficultyScale, 0, 1);
   }
 
   private tuneAt(z: number): number {
@@ -487,7 +490,7 @@ export class World {
   }
 
   private basePressure(biome: BiomeId): number {
-    const target = BIOME_TARGET[biome] ?? 4;
+    const target = Math.min(100, (BIOME_TARGET[biome] ?? 4) * this.difficultyScale);
     return (0.2 + (target / 100) * 3.7) * (HAZARD_TUNE[biome] ?? 1);
   }
 

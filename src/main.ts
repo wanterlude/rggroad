@@ -46,8 +46,13 @@ try {
   const seedRaw = query.get("seed");
   const rowRaw = query.get("row");
   const biomeRaw = query.get("biome");
+  const scaleRaw = query.get("dscale");
   const seed = seedRaw !== null && Number.isFinite(Number(seedRaw)) ? Math.max(0, Math.trunc(Number(seedRaw))) : undefined;
   const row = rowRaw !== null && Number.isFinite(Number(rowRaw)) ? Math.max(0, Math.trunc(Number(rowRaw))) : undefined;
+  const difficultyScale =
+    scaleRaw !== null && Number.isFinite(Number(scaleRaw))
+      ? Math.min(4, Math.max(0.5, Number(scaleRaw)))
+      : undefined;
   const knownBiomes: string[] = [...BIOME_ORDER, ...INTERMEDIATE_ORDER];
   const biome =
     biomeRaw !== null && knownBiomes.includes(biomeRaw) ? (biomeRaw as BiomeId) : undefined;
@@ -59,6 +64,7 @@ try {
     seed,
     row,
     biome,
+    difficultyScale,
     bot: query.get("bot") === "1",
     autostart: query.get("start") === "1" || query.get("autoplay") === "1",
     noAutostart: query.get("nostart") === "1",
