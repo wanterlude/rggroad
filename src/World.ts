@@ -141,6 +141,9 @@ const EAGLE_WARNING_SECONDS = 10;
 const PLAYER_X_LIMIT = 30;
 /** Four-lane roads unlock only after this row. */
 const FOUR_LANE_FROM = 160;
+/** From the first storm onward the run becomes 1.5x easier. */
+const STORM_RELIEF_FROM = BIOME_SPAN * 3;
+const STORM_RELIEF = 1 / 1.5;
 /** How far trees, rocks and decorative props may spread across a row. */
 const PROP_SPAN = 30;
 /** Hazard cells span the visible grass strip, not only the middle lanes. */
@@ -483,8 +486,12 @@ export class World {
     return previous + (target - previous) * smooth;
   }
 
+  private stormReliefAt(z: number): number {
+    return z >= STORM_RELIEF_FROM ? STORM_RELIEF : 1;
+  }
+
   private riskAt(z: number): number {
-    return clamp((this.targetAt(z) / 100) * this.difficultyScale, 0, 1);
+    return clamp((this.targetAt(z) / 100) * this.difficultyScale * this.stormReliefAt(z), 0, 1);
   }
 
   private tuneAt(z: number): number {
@@ -502,11 +509,12 @@ export class World {
    * keeps the curve continuous across a biome border.
    */
   private pressureAt(z: number): number {
+    const relief = this.stormReliefAt(z);
     const base = this.basePressure(this.biomeAt(z).id);
     if (this.forceBiomeId) {
       const t = clamp(z / BIOME_SPAN, 0, 1);
       const smooth = t * t * (3 - 2 * t);
-      return base * (0.55 + 0.45 * smooth);
+      return base * (0.55 + 0.45 * smooth) * relief;
     }
     if (this.mode !== "run") return base;
     const segment = biomeSegmentAt(z);
@@ -518,7 +526,7 @@ export class World {
       segment.start > 0
         ? this.basePressure(biomeSegmentAt(segment.start - 1).biome)
         : current * 0.55;
-    return previous + (current - previous) * smooth;
+    return (previous + (current - previous) * smooth) * relief;
   }
 
   /** The pressure curve already contains the local 30-row ramp. */
