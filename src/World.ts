@@ -139,6 +139,8 @@ const DEMO_PLAN_MAX_AHEAD = 7;
 const EAGLE_IDLE_SECONDS = 15;
 const EAGLE_WARNING_SECONDS = 10;
 const PLAYER_X_LIMIT = 30;
+/** Four-lane roads unlock only after this row. */
+const FOUR_LANE_FROM = 160;
 /** How far trees, rocks and decorative props may spread across a row. */
 const PROP_SPAN = 30;
 /** Hazard cells span the visible grass strip, not only the middle lanes. */
@@ -303,7 +305,7 @@ export class World {
     this.forceBiomeId = options.forceBiome ?? null;
     this.botEnabled = options.bot === true;
     this.debugStart = options.startZ ?? 0;
-    this.difficultyScale = options.difficultyScale ?? 2.4;
+    this.difficultyScale = options.difficultyScale ?? 2.0;
     this.demoBiomeIndex = options.demoBiome ?? 0;
     this.skinId = options.skin;
     this.sceneView = options.sceneView;
@@ -800,8 +802,9 @@ export class World {
 
   private addRoadSegment(z: number): void {
     const d = this.difficultyAt(z);
+    const laneCap = z >= FOUR_LANE_FROM ? 4 : 3;
     const width = Math.min(
-      clamp(1 + Math.floor(this.rng() * (1.45 + d * 2.2)), 1, 4),
+      clamp(1 + Math.floor(this.rng() * (1.45 + d * 2.2)), 1, laneCap),
       this.segmentRoom(z)
     );
     const baseDir: 1 | -1 = this.rng() < 0.5 ? 1 : -1;
