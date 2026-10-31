@@ -154,10 +154,10 @@ export interface BiomeDef {
   mechanics?: BiomeMechanics;
 }
 
-export const BIOME_SPAN = 30;
+export const BIOME_SPAN = 20;
 /** A short special segment is inserted after this many main biomes. */
 export const MAIN_BIOMES_PER_INTERMEDIATE = 3;
-export const INTERMEDIATE_SPAN = 12;
+export const INTERMEDIATE_SPAN = 8;
 export const INTERMEDIATE_ORDER: SpecialBiomeId[] = ["storm", "flood", "crossroads"];
 
 export const BIOME_ORDER: BiomeId[] = [
@@ -1160,7 +1160,7 @@ export interface BiomeSegment {
   cycle: number;
 }
 
-// Precomputed run plan: main biomes of 30 rows with a short intermediate
+// Precomputed run plan: main biomes of 20 rows with a short intermediate
 // segment after every third main biome. Precomputing keeps biomeForZ cheap
 // even though segment lengths differ.
 const SCHEDULE_ROWS = 240_000;
