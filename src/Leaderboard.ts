@@ -1,4 +1,4 @@
-import { FIREBASE_DB_URL } from "./leaderboard-config";
+import { FIREBASE_DB_URL, LEADERBOARD_API } from "./leaderboard-config";
 
 export type LeaderboardStatus = "unconfigured" | "loading" | "ready" | "offline";
 
@@ -160,7 +160,7 @@ export class Leaderboard {
   }
 
   refresh(): void {
-    if (!this.dbUrl) {
+    if (!this.dbUrl && !LEADERBOARD_API) {
       this.status = "unconfigured";
       this.emit();
       return;
@@ -177,6 +177,49 @@ export class Leaderboard {
     this.status = "loading";
     this.error = null;
     this.emit();
+    void this.loadFromApi(seq).then((ok) => {
+      if (!ok && seq === this.requestSeq) this.loadFromFirebase(seq);
+    });
+  }
+
+  /** Основная база — VPS. Если он недоступен, вызывается Firebase. */
+  private async loadFromApi(seq: number): Promise<boolean> {
+    if (!LEADERBOARD_API) return false;
+    try {
+      const data = await this.fetchJson<{ scores?: Array<{ name?: string; score?: number; ts?: number }> }>(
+        `${LEADERBOARD_API}?game=rgg-road&limit=${FETCH_LIMIT}`,
+        5000
+      );
+      if (seq !== this.requestSeq) return true;
+      const entries: LeaderboardEntry[] = [];
+      for (const [index, row] of (data?.scores ?? []).entries()) {
+        const score = Number(row?.score);
+        if (!Number.isFinite(score) || score <= 0) continue;
+        const name = (typeof row?.name === "string" ? row.name : "Игрок").slice(0, 16);
+        const ts = Number.isFinite(Number(row?.ts)) ? Number(row?.ts) : 0;
+        const entry: LeaderboardEntry = { id: `vps-${index}`, name, score: Math.floor(score), ts };
+        if (ts > 1e12) {
+          const info = runDateInfo(new Date(ts));
+          entry.title = `${name} · ${info.label}`;
+          entry.runDate = info.runDate;
+          entry.runTime = info.runTime;
+          entry.runAt = info.runAt;
+        }
+        entries.push(entry);
+      }
+      if (!entries.length) return false;
+      this.entries = entries
+        .sort((a, b) => b.score - a.score || a.ts - b.ts)
+        .slice(0, TOP);
+      this.status = "ready";
+      this.emit();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private loadFromFirebase(seq: number): void {
     const query =
       `${this.dbUrl}/leaderboard.json` +
       `?orderBy=${encodeURIComponent('"score"')}&limitToLast=${FETCH_LIMIT}`;
@@ -248,7 +291,24 @@ export class Leaderboard {
       });
   }
 
+  /** Отправка результата в основную базу (VPS). Вторая база не мешает. */
+  private async pushApi(score: number): Promise<void> {
+    if (!LEADERBOARD_API || !this.playerName) return;
+    try {
+      await fetch(LEADERBOARD_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ game: "rgg-road", name: this.playerName, score, ts: Date.now() }),
+        keepalive: true
+      });
+    } catch {
+      /* VPS недоступен — результат всё равно уйдёт в Firebase */
+    }
+  }
+
   private async push(score: number): Promise<void> {
+    if (!this.dbUrl && !LEADERBOARD_API) return;
+    void this.pushApi(score);
     if (!this.dbUrl) return;
     try {
       const ownUrl = `${this.dbUrl}/leaderboard/${encodeURIComponent(this.playerId)}.json`;
@@ -293,9 +353,9 @@ export class Leaderboard {
       : "НЕТ СВЯЗИ С FIREBASE";
   }
 
-  private async fetchJson<T>(url: string): Promise<T> {
+  private async fetchJson<T>(url: string, timeout = 8000): Promise<T> {
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 8000);
+    const timer = window.setTimeout(() => controller.abort(), timeout);
     try {
       const response = await fetch(url, { signal: controller.signal });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);

@@ -7,3 +7,9 @@
  */
 export const FIREBASE_DB_URL =
   "https://rgg-road-default-rtdb.asia-southeast1.firebasedatabase.app";
+
+/**
+ * Рейтинг на VPS (wanterlude.ru). Основная база: читаем и пишем сюда.
+ * Firebase остаётся второй, резервной базой — туда результат уходит тоже.
+ */
+export const LEADERBOARD_API = "/api/scores.php";
